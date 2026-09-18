@@ -16,7 +16,7 @@ Windows, macOS և Linux (Ubuntu/Xubuntu family) հարթակների փոքր de
 
 ![Հիմնական պատուհանի նախնական տեսքը](apps/student/դասացուցակ-01.png)
 
-Պատկերը նախնական UI-ն է․ ներկայիս տարբերակում ավելացված են թարմացումը, ամփոփումը և կարգավորումները։
+Պատկերը նախնական UI-ն է․ ներկայիս տարբերակում ավելացված է ամփոփումը, իսկ թարմացումն ու կարգավորումները հասանելի են tray-ից։
 
 ## Տվյալներ և validation
 
@@ -38,12 +38,10 @@ Windows, macOS և Linux (Ubuntu/Xubuntu family) հարթակների փոքր de
 | Ծանուցումներ | Միացված | Գլխավոր անջատիչ՝ հիշեցումների, զանգի և խոսքի համար |
 | Ձայն | Միացված | Կարճ երկտոն զանգ հիշեցումների ժամանակ |
 | Խոսք | Անջատված | Հիշեցման հայերեն տեքստի արտասանում |
-| Մուտք գործելիս գործարկել (Launch at login) | Անջատված | Առկա autostart plugin-ի միջոցով գրանցում/հեռացում OS-ում |
-| Բացել tray-ում | Անջատված | Հաջորդ գործարկման ժամանակ պատուհանը սկզբից թաքնված է |
 
-Գործարկման ժամանակ autostart-ի checkbox-ը արտացոլում է իրական OS վիճակը։ Եթե կարգավորումը չի պահպանվում, ցուցադրվում է սխալ․ autostart-ի փոփոխության դեպքում կատարվում է OS վիճակի վերադարձի փորձ։ Վնասված settings ֆայլի դեպքում կիրառվում են defaults-ը, սխալը գրանցվում է log-ում։
+Մուտք գործելիս գործարկումն ու tray-ում թաքնված մեկնարկը մշտական վարք են։ Յուրաքանչյուր մեկնարկին Tauri autostart plugin-ը միացնում է OS գրանցումը։ Հին `autostartEnabled`/`startMinimized` արժեքներն անտեսվում են։ Գրանցման ձախողումը գրվում է log-ում՝ առանց հավելվածի գործարկումն ընդհատելու։ Tray-ի ստեղծման ձախողման դեպքում պատուհանը ցուցադրվում է։ Վնասված settings ֆայլի դեպքում կիրառվում են defaults-ը, սխալը գրանցվում է log-ում։
 
-Tray-ի ընտրացանկը՝ «Բացել», «Թարմացնել դասացուցակը», checked «Ձայն» և «Խոսք», «Կարգավորումներ», «Ելք»։ Գլխավոր պատուհանում թարմացման կոճակ և կարգավորումների բաժին չկան։ Tray-ի «Կարգավորումներ»-ը բացում է առանձին dialog՝ «Փակել» կոճակով և Escape-ով փակելու հնարավորությամբ։ Փոփոխությունները համաժամացվում են tray-ի հետ և պահվում ֆայլում։ «Փորձարկել զանգը» կոճակը կարգավորումների dialog-ում է։
+Tray-ի ընտրացանկը՝ «Բացել», «Թարմացնել դասացուցակը», նշվող «Ծանուցումներ», «Ձայն», «Խոսք» և «Ելք»։ Կարգավորումների դիալոգ չկա։ Փոփոխություններն անմիջապես պահվում են ֆայլում։ Պահպանման սխալը ցուցադրվում է գլխավոր պատուհանում, իսկ ընտրացանկի նշումները վերադառնում են պահպանված վիճակին։
 
 ## Ձայն և խոսք
 
@@ -68,7 +66,7 @@ apps/student/
     main.ts             # UI, refresh, օրափոխություն
     schedule.ts         # Gist, validation, cache commands
     summary.ts          # ընթացիկ/հաջորդ դասի հաշվարկ
-    settings.ts         # settings UI և backend commands
+    settings.ts         # settings state և backend commands
     tray.ts             # tray-ից եկող frontend events
     audio.ts            # playBell() → Rust
     speech.ts           # optional speechSynthesis
@@ -80,7 +78,7 @@ apps/student/
       model.rs          # դասացուցակի տիպեր
       scheduler.rs      # pure scheduler logic և worker
       storage.rs        # app-data JSON cache
-      settings.rs       # settings persistence, autostart
+      settings.rs       # settings persistence
       tray.rs           # native tray և checked items
       audio.rs          # ընդհանուր native audio backend
     assets/bell.wav
@@ -130,9 +128,9 @@ npm run tauri build
 
 Նոր փոփոխությունները պետք է պահպանեն Windows/macOS/Linux աջակցությունը։ Օգտագործեք Tauri-ի cross-platform API-ները, platform-neutral անվանումները և application-data/config path resolver-ները։ Անհրաժեշտ OS տարբերությունները պահեք փոքր adapter-ներում։ Այդ կանոնները ամրագրված են նաև [apps/student/AGENTS.md](apps/student/AGENTS.md)-ում։
 
-- **Tray․** օգտագործվում է Tauri-ի ընդհանուր menu API-ն։ Linux-ում գործողությունները հասանելի են menu-ի միջոցով․ raw tray click events-ի վրա հենվել պետք չէ ([Tauri tray docs](https://v2.tauri.app/learn/system-tray/#listen-to-tray-events))։ Desktop panel-ը պետք է ցուցադրի AppIndicator/StatusNotifier icon-երը։ Tray-ի ստեղծման սխալի դեպքում պատուհանը մնում է տեսանելի, իսկ Close-ը կարող է փակել ծրագիրը։ OS API-ն չի երաշխավորում, որ հաջող ստեղծված icon-ը իսկապես երևում է panel-ում․ hidden startup-ը միացրեք tray-ի հասանելիությունը ստուգելուց հետո։
+- **Tray․** օգտագործվում է Tauri-ի ընդհանուր menu API-ն։ Linux-ում գործողությունները հասանելի են menu-ի միջոցով․ raw tray click events-ի վրա հենվել պետք չէ ([Tauri tray docs](https://v2.tauri.app/learn/system-tray/#listen-to-tray-events))։ Desktop panel-ը պետք է ցուցադրի AppIndicator/StatusNotifier icon-երը։ Tray-ի ստեղծման սխալի դեպքում պատուհանը մնում է տեսանելի, իսկ Close-ը կարող է փակել ծրագիրը։ OS API-ն չի երաշխավորում, որ հաջող ստեղծված icon-ը իսկապես երևում է panel-ում․ tray-ի հասանելիությունը ստուգեք տվյալ desktop session-ում։
 - **macOS․** Dock-ի reopen իրադարձությունը վերադարձնում է պատուհանը։ Menu bar-ի tray-ը շարունակում է աշխատել։
-- **Launch at login․** բոլոր OS-երում օգտագործվում է առկա Tauri autostart plugin-ը․ macOS-ում ընտրված է LaunchAgent-ը։ Իրական OS վիճակը կարդացվում է startup-ին։ Linux AppImage-ի դեպքում այն պահեք կայուն տեղում՝ login entry-ի հղումը պահպանելու համար։
+- **Launch at login․** բոլոր OS-երում օգտագործվում է առկա Tauri autostart plugin-ը․ macOS-ում ընտրված է LaunchAgent-ը։ Գրանցումը միացվում է յուրաքանչյուր startup-ին։ Linux AppImage-ի դեպքում այն պահեք կայուն տեղում՝ login entry-ի հղումը պահպանելու համար։
 - **Native system notification․** օգտագործվում է նույն Tauri plugin-ը։ Թույլտվությունները և Do Not Disturb/Focus-ը կառավարում է տվյալ OS-ը։
 - **Speech․** Windows WebView2-ը, macOS WKWebView-ը և Linux WebKitGTK-ն կարող են ունենալ տարբեր speech/voice աջակցություն։ API-ի կամ հայերեն voice-ի բացակայությունը մշակվում է որպես optional feature-ի անհասանելիություն։
 

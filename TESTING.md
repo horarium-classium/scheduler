@@ -33,10 +33,10 @@ TypeScript թեստերը ծածկում են validation/cache/timeout/refresh, 
 - [ ] Առանց cache-ի և կապի կա հասկանալի error ու կրկին փորձելու հնարավորություն։
 - [ ] Invalid time/day/name/overlap և վնասված cache-ը չեն փոխանցվում scheduler-ին։
 - [ ] Գլխավոր պատուհանում «Թարմացնել» և «Կարգավորումներ» գործողություններ չկան։ Tray-ի refresh-ը թարմացնում է UI/cache/scheduler-ը։ Սխալը պահպանում է գործող տվյալները։
-- [ ] Tray-ի «Կարգավորումներ»-ը բացում է modal dialog նաև թաքնված պատուհանից։ Այն փակվում է «Փակել»-ով և Escape-ով, իսկ կրկնակի բացումը սխալ չի առաջացնում։
+- [ ] Կարգավորումների դիալոգ չկա։ Tray-ի երեք անջատիչները փոխում են համապատասխան կարգավորումները, իսկ պահպանման սխալի դեպքում նշումները վերականգնվում են և գլխավոր պատուհանում երևում է սխալը։
 - [ ] Արագ կրկնակի refresh-ը չի ստեղծում զուգահեռ հարցումներ։
 - [ ] Current/next summary-ն, progress-ը և ազատ օրվա վիճակը ճիշտ են, նաև օրափոխությունից հետո։
-- [ ] Settings-ը պահպանվում է restart-ից հետո, UI-ն ու tray checkmarks-ը համաժամացված են։
+- [ ] Settings-ը պահպանվում է restart-ից հետո, tray checkmarks-ը համապատասխանում են պահպանված վիճակին։
 - [ ] Առանց հայերեն voice-ի կամ speech API-ի ծրագիրը շարունակում է աշխատել։
 - [ ] Օրվա փոփոխությամբ հին notification key-երը հեռացվում են, կեսգիշերի նախազգուշացումը չի կրկնվում։
 
@@ -47,8 +47,8 @@ OS/version/architecture, build revision և ամսաթիվ՝ **չստուգված
 - [ ] MSI/NSIS build, install, launch, uninstall և WebView2 առկայություն։
 - [ ] Նոր գիրք/ժամացույց icon-ը երևում է installer-ում, Start/taskbar-ում և tray-ում՝ light/dark theme ու տարբեր scaling-ով։
 - [ ] Native system notification՝ նախազգուշացում, ավարտ, ընթացող դասի ընթացքում startup և duplicate suppression։ Ստուգել notification permissions/Do Not Disturb-ը։
-- [ ] System tray՝ Close → hide, Open, Refresh, Settings, Quit։
-- [ ] Launch at login՝ enable/disable, OS-ի իրական state և հաջորդ login։
+- [ ] System tray՝ Close → hide, Open, Refresh, կարգավորումների անջատիչներ, Quit։
+- [ ] Launch at login՝ ավտոմատ գրանցում առաջին և հաջորդ մեկնարկներին, հաջորդ login-ից գործարկում, նաև հին false կարգավորումներով։
 - [ ] Start minimized՝ սովորական launch/login առանց window flash-ի, tray-ից վերադարձ։
 - [ ] Sleep/wake՝ բաց թողնված start/end և կեսգիշեր, յուրաքանչյուր event միայն մեկ անգամ։
 - [ ] Sound՝ տեսանելի/թաքնված պատուհան, on/off, համաժամանակյա զանգերի միավորում, volume mixer, audio device-ի անջատում և հաջորդ զանգի վերականգնում։
@@ -63,8 +63,8 @@ OS/version/architecture, build revision և ամսաթիվ՝ **չստուգված
 - [ ] `.app`/`.dmg` build, drag-install, launch և uninstall։ Ստորագրում/notarization-ը ստուգել տարածման փուլում։
 - [ ] Նոր icon-ը երևում է Finder/Dock-ում, իսկ menu bar-ի template icon-ը ընթեռնելի է light/dark mode-ում և Retina/non-Retina էկրաններին։
 - [ ] Native system notification՝ Notification Center, permissions/Focus, նախազգուշացում/ավարտ և duplicate suppression։
-- [ ] Menu bar tray՝ Close → hide, Open, Refresh, Settings, Quit։ Dock reopen-ը վերադարձնում է պատուհանը։
-- [ ] Launch at login՝ LaunchAgent enable/disable և logout/login-ից հետո փաստացի գործարկում։
+- [ ] Menu bar tray՝ Close → hide, Open, Refresh, կարգավորումների անջատիչներ, Quit։ Dock reopen-ը վերադարձնում է պատուհանը։
+- [ ] Launch at login՝ LaunchAgent ավտոմատ գրանցում և logout/login-ից հետո փաստացի գործարկում։
 - [ ] Start minimized՝ launch/login առանց window flash-ի, tray և Dock reopen։
 - [ ] Sleep/wake՝ missed start/end, կեսգիշեր, կրկնությունների բացակայություն։
 - [ ] Sound՝ native output, on/off, թաքնված պատուհան, output device-ի փոփոխություն/անջատում և վերականգնում։
@@ -79,13 +79,13 @@ Distro/version, desktop session (GNOME/XFCE), X11/Wayland, architecture, revisio
 - [ ] `.deb`/`.AppImage` build, install/run և uninstall։ Ստուգել WebKitGTK/ALSA runtime dependencies-ը և AppImage-ի պահանջները տվյալ distro-ում։
 - [ ] Նոր icon-ը երևում է launcher-ում և GNOME/XFCE tray-ում՝ light/dark panel-ներով ու տարբեր scaling-ով։
 - [ ] Native system notification՝ session notification daemon-ի միջոցով, pre-alert/end, Do Not Disturb և duplicate suppression։
-- [ ] Tray՝ AppIndicator/StatusNotifier-ը երևում է GNOME/XFCE panel-ում, menu-ի Open/Refresh/Settings/Quit-ը աշխատում են։ Raw tray click event չի պահանջվում։
+- [ ] Tray՝ AppIndicator/StatusNotifier-ը երևում է GNOME/XFCE panel-ում, menu-ի Open/Refresh/կարգավորումների անջատիչներ/Quit-ը աշխատում են։ Raw tray click event չի պահանջվում։
 - [ ] Tray-ի ստեղծման սխալի դեպքում app-ը մնում է տեսանելի․ Close-ը չի թաքցնում այն անհասանելի վիճակում։ Ստուգել նաև panel-ի բացակայության սահմանափակումը։
-- [ ] Launch at login՝ desktop autostart entry, enable/disable, հաջորդ graphical login, AppImage-ի կայուն ուղի։
+- [ ] Launch at login՝ desktop autostart entry-ի ավտոմատ գրանցում, հաջորդ graphical login, AppImage-ի կայուն ուղի։
 - [ ] Start minimized՝ միայն գործող tray-ով, login և սովորական launch, menu-ից վերականգնում։
 - [ ] Sleep/wake՝ missed start/end, կեսգիշեր և duplicate suppression։
 - [ ] Sound՝ ALSA/default output՝ տվյալ համակարգի PulseAudio/PipeWire ինտեգրմամբ, on/off, թաքնված պատուհան, սարքի փոփոխություն/անջատում և վերականգնում։
-- [ ] Speech՝ WebKitGTK API/voice availability։ Հայերեն voice-ի բացակայության դեպքում կա բացատրություն, crash չկա։ Առկայության դեպքում՝ hidden window և cancellation։
+- [ ] Speech՝ WebKitGTK API/voice availability։ Հայերեն voice-ի բացակայության դեպքում crash չկա։ Առկայության դեպքում՝ hidden window և cancellation։
 - [ ] Notifications-disabled՝ նոր notification, զանգ և խոսք չեն գործարկվում։
 - [ ] Ընդհանուր functional checklist-ը կատարված է։
 
