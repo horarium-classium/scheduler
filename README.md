@@ -16,13 +16,31 @@
 - Ժամի սյունակում ցույց է տալիս ընթացող դասի անցած և մնացած մասը։
 - Դասի սկսվելուց մեկ րոպե առաջ ուղարկում է Windows-ի native ծանուցում։
 - Դասի ավարտից հետո տեղեկացնում է հաջորդ դասի մասին։
+- Ծանուցումների scheduler-ը աշխատում է Rust/Tauri backend-ում՝ անկախ թաքնված WebView-ի timer-ից։
 - Աշխատում է system tray-ում, որպեսզի չզբաղեցնի էկրանի մեծ մասը։
 - Պատուհանը փակելիս ծրագիրը շարունակում է աշխատել tray-ում։
 - Աջակցում է Windows installer-ի MSI և NSIS փաթեթավորմանը։
 
 ## Ինչ տեսք ունի
 
-![հիմնական պատուհանը](դասացուցակ-01.png)
+![հիմնական պատուհանը](apps/student/դասացուցակ-01.png)
+
+## Նախագծի կառուցվածք
+
+```text
+apps/
+	student/       # Դասացուցակ Windows desktop application
+		src/         # TypeScript, HTML և CSS
+		src-tauri/   # Tauri և Rust bootstrap
+```
+
+Development-ի համար աշխատեք `apps/student` պանակում.
+
+```powershell
+cd apps/student
+npm install
+npm run tauri dev
+```
 
 ## Ինչպես օգտագործել
 
@@ -48,6 +66,7 @@
 - TypeScript՝ frontend logic-ի համար
 - Vanilla HTML և CSS՝ առանց UI framework-ի
 - Rust՝ Tauri-ի նվազագույն bootstrap-ի և tray-ի համար
+- Rust՝ հուսալի scheduler-ի, sleep/wake catch-up-ի և native notification triggering-ի համար
 - Official Tauri notification և autostart plugins
 
 Չեն օգտագործվում React, Vue, Svelte կամ այլ frontend framework-ներ։
