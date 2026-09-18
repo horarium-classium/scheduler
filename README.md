@@ -1,85 +1,67 @@
-# Tauri + Vanilla TS
+# Դասացուցակ
 
-This template should help get you started developing with Tauri in vanilla HTML, CSS and Typescript.
+## Ձեր օրվա դասերը՝ մեկ փոքր պատուհանում
 
-## Recommended IDE Setup
+**Դասացուցակ (Horarium Classium)**-ը Windows-ի համար նախատեսված թեթև desktop ծրագիր է, որը ցույց է տալիս օրվա դասերը և հիշեցնում դասի սկսվելու ու ավարտվելու մասին։
 
+Ծրագիրը նախատեսված է աշակերտների, ծնողների և ուսուցիչների համար, ովքեր ուզում են դասացուցակը տեսնել արագ՝ առանց կայք կամ մեծ հավելված բացելու։
 
-# Դասացուցակ (Horarium)
+> Նպատակը պարզ է՝ մի հայացքով հասկանալ, թե ինչ դաս է հիմա, որն է հաջորդը և որքան ժամանակ է մնացել։
 
-Փոքր Windows desktop application՝ շաբաթական դասացուցակը դիտելու և հետագայում դասերի մասին հիշեցումներ ստանալու համար։
+## Ինչ է անում ծրագիրը
 
-## Technology
+- Բեռնում է հրապարակված դասացուցակը GitHub-ից։
+- Ցույց է տալիս ընթացիկ օրվա դասերը՝ ըստ ժամերի։
+- Ընթացող դասը նշում է `Հիմա` պիտակով։
+- Ժամի սյունակում ցույց է տալիս ընթացող դասի անցած և մնացած մասը։
+- Դասի սկսվելուց մեկ րոպե առաջ ուղարկում է Windows-ի native ծանուցում։
+- Դասի ավարտից հետո տեղեկացնում է հաջորդ դասի մասին։
+- Աշխատում է system tray-ում, որպեսզի չզբաղեցնի էկրանի մեծ մասը։
+- Պատուհանը փակելիս ծրագիրը շարունակում է աշխատել tray-ում։
+- Աջակցում է Windows installer-ի MSI և NSIS փաթեթավորմանը։
 
-- Tauri 2
-- Rust backend
-- TypeScript, Vanilla HTML և CSS
-- Vite և npm
+## Ինչ տեսք ունի
+
+![հիմնական պատուհանը](դասացուցակ-01.png)
+
+## Ինչպես օգտագործել
+
+1. Տեղադրեք ծրագիրը Windows-ում։
+2. Գործարկեք «Դասացուցակ»-ը։
+3. Ծրագիրը ինքնուրույն կբեռնի օրվա դասացուցակը։
+4. Պատուհանը փակելու դեպքում ծրագիրը կմնա system tray-ում։
+5. Դասի սկսվելուց առաջ հետևեք Windows-ի ծանուցմանը։
+
+Ծրագիրը նախատեսված է արագ ստուգումների համար․ այն բացելու կամ օգտագործելու համար անհրաժեշտ չէ մուտք գործել հաշիվ կամ անցնել բարդ կարգավորումների միջով։
+
+## Տվյալների աղբյուր
+
+Դասացուցակը հրապարակվում է GitHub Gist-ում և բեռնվում է ծրագրի գործարկման ժամանակ։ Սա թույլ է տալիս թարմացնել դասացուցակը մեկ տեղում՝ առանց հավելվածը նորից տեղադրելու։
+
+Տվյալների աղբյուրը պետք է հասանելի լինի ինտերնետով։ Առանց կապի ծրագրի offline fallback-ը դեռ նախատեսվող բարելավում է։
+
+## Տեխնոլոգիա
+
+Ծրագիրը կառուցված է փոքր և թեթև stack-ով.
+
+- Tauri 2՝ Windows desktop shell-ի համար
+- TypeScript՝ frontend logic-ի համար
+- Vanilla HTML և CSS՝ առանց UI framework-ի
+- Rust՝ Tauri-ի նվազագույն bootstrap-ի և tray-ի համար
 - Official Tauri notification և autostart plugins
-- Schedule data loaded from the GitHub Gist
 
-React, Vue, Svelte, Angular և UI framework-ներ չեն օգտագործվում։
+Չեն օգտագործվում React, Vue, Svelte կամ այլ frontend framework-ներ։
 
-## Prerequisites
+## Ներբեռնում և զարգացում
 
-- Node.js և npm
-- Rust և Cargo՝ `stable-x86_64-pc-windows-msvc` toolchain-ով
-- Windows WebView2 Runtime
+Այս նախագիծը դեռ ակտիվ զարգացման փուլում է։ Հետագա ուղղություններն են՝
 
-## Development
+- շաբաթվա ամբողջական դասացուցակի դիտում և խմբագրում,
+- offline cache և fallback տվյալներ,
+- autostart-ի կարգավորում,
+- ձայնային ազդանշան և text-to-speech,
+- ավելի մանրամասն settings պատուհան։
 
-```powershell
-npm install
-npm run tauri dev
-```
+## Կարճ ասած
 
-Frontend-only build-ը ստուգելու համար՝
-
-```powershell
-npm run build
-```
-
-Windows application bundle ստեղծելու համար՝
-
-```powershell
-npm run tauri build
-```
-
-## Structure
-
-```text
-src/
-	main.ts          # Main window rendering and notification test button
-	schedule.ts      # Gist loader, validation, and Armenian day names
-	scheduler.ts     # Timer and duplicate-notification protection
-	notifications.ts # Native notification wrapper
-	audio.ts         # Sound placeholder
-	speech.ts        # Browser speechSynthesis wrapper
-	tray.ts          # Frontend tray boundary placeholder
-	settings.ts      # Autostart wrapper
-	types.ts         # Lesson and DaySchedule interfaces
-	style.css        # Plain application styles
-src-tauri/
-	src/lib.rs       # Tauri plugins and system tray menu
-	capabilities/    # Minimal plugin permissions
-```
-
-## Implemented
-
-- Armenian sample schedule displayed in the main window.
-- The current day's lessons are loaded from the versioned GitHub Gist at startup.
-- The scheduler checks every 30 seconds for lesson starts and ends.
-- Start and end notifications are sent at most once per lesson and day.
-- Native notification test button with permission handling.
-- System tray menu with `Բացել` and `Ելք` actions.
-- Notification and autostart plugins installed and configured.
-- Autostart remains disabled unless enabled through the future Settings UI.
-
-## TODO
-
-- Load and edit a complete weekly schedule.
-- Add a local cache or bundled fallback for offline startup.
-- Hide the window to the tray when it is closed.
-- Connect sound and speech settings to the tray/UI.
-- Add Windows autostart settings UI.
-- Test native notifications in an installed Windows build.
+**Դասացուցակ**-ը նախատեսված է նրանց համար, ովքեր ուզում են օրվա դասերի մասին տեղեկությունը պահել տեսանելի, պարզ և հանգիստ ձևով՝ հենց Windows-ի desktop-ում։
