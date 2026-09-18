@@ -20,7 +20,7 @@ Native փաթեթավորումը գործարկեք համապատասխան OS
 | macOS | `npm run tauri build -- --bundles app,dmg` |
 | Ubuntu/Xubuntu | `npm run tauri build -- --bundles deb,appimage` |
 
-[Desktop CI](.github/workflows/desktop.yml)-ն ունի Windows, macOS և Ubuntu 22.04/24.04 native runner-ներ։ Linux system dependencies-ը տեղադրվում են workflow-ում։ CI-ն չի փորձում headless runner-ում հաստատել toast, tray, audio կամ speech վարքը։
+[Windows MSI CI](.github/workflows/desktop.yml)-ն աշխատում է միայն `windows-latest` runner-ով և արտահանում միայն MSI artifact։ macOS/Linux build-երը կատարվում են ձեռքով համապատասխան միջավայրերում։ CI-ն չի փորձում headless runner-ում հաստատել toast, tray, audio կամ speech վարքը։
 
 TypeScript թեստերը ծածկում են validation/cache/timeout/refresh, current-next summary և speech-ի բացակայությունը։ Rust թեստերը՝ scheduler-ի նախազգուշացում, ավարտի հատում, հաջորդ դաս, կրկնությունների կանխում, sleep/wake/կեսգիշեր, JSON persistence և sound-disabled վարք։ Bundled PCM ֆորմատն ու audio sample-ները ստուգվում են առանց ֆիզիկական audio device-ի։
 

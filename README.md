@@ -1,5 +1,7 @@
 # Դասացուցակ — Horarium Classium
 
+[![Windows MSI](https://github.com/armenbadal/horarium-classium/actions/workflows/desktop.yml/badge.svg?branch=master)](https://github.com/armenbadal/horarium-classium/actions/workflows/desktop.yml)
+
 Windows, macOS և Linux (Ubuntu/Xubuntu family) հարթակների փոքր desktop utility՝ օրվա դասերը տեսնելու և դասերի մեկնարկից ու ավարտից տեղեկանալու համար։ Հավելվածը կառուցված է TypeScript + Vanilla HTML/CSS, Tauri 2 և Rust տեխնոլոգիաներով։ Դասացուցակը բեռնվում է frontend-ում, իսկ հիշեցումների scheduler-ը աշխատում է Rust-ում՝ անկախ թաքնված պատուհանի timer-ից։
 
 ## Հնարավորություններ
@@ -95,7 +97,7 @@ sudo apt-get update
 sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev patchelf
 ```
 
-Linux-ի լայն համատեղելիության համար build արեք աջակցվող ամենահին բազայի վրա․ CI-ն ներառում է Ubuntu 22.04 և 24.04։ Ավելի նոր համակարգում build-ը կարող է պահանջել ավելի նոր glibc, ինչպես նկարագրված է [Tauri-ի Debian ուղեցույցում](https://v2.tauri.app/distribute/debian/#limitations)։
+Linux-ի լայն համատեղելիության համար build արեք աջակցվող ամենահին բազայի վրա․ Ubuntu/Xubuntu build-ը ստուգեք ձեռքով։ Ավելի նոր համակարգում build-ը կարող է պահանջել ավելի նոր glibc, ինչպես նկարագրված է [Tauri-ի Debian ուղեցույցում](https://v2.tauri.app/distribute/debian/#limitations)։
 
 Հրամանները՝ `apps/student` պանակից․
 
@@ -122,7 +124,7 @@ npm run tauri build
 | macOS | `npm run tauri build -- --bundles app,dmg` | `.app`, `.dmg` |
 | Ubuntu/Xubuntu | `npm run tauri build -- --bundles deb,appimage` | `.deb`, `.AppImage` |
 
-Արդյունքները՝ `apps/student/src-tauri/target/release/bundle/`։ Ստորագրումն ու տարածումը այս աշխատանքի մաս չեն։ [Desktop CI matrix-ը](.github/workflows/desktop.yml) կատարում է թեստերը, Rust check-ը և native bundle build-ը Windows, macOS, Ubuntu 22.04 և 24.04 runner-ների վրա՝ push/PR կամ ձեռքով գործարկման ժամանակ։ Workflow-ի առկայությունը դեռ build-ի հաջողության ապացույց չէ․ այս փոփոխությունների համար remote CI չի գործարկվել։
+Արդյունքները՝ `apps/student/src-tauri/target/release/bundle/`։ Ստորագրումն ու տարածումը այս աշխատանքի մաս չեն։ [Windows MSI CI-ն](.github/workflows/desktop.yml) կատարում է թեստերը, Rust check-ը և միայն Windows MSI build-ը՝ push/PR կամ ձեռքով գործարկման ժամանակ։ `horarium-windows-msi` artifact-ը պարունակում է միայն `.msi` ֆայլերը։ macOS/Linux աջակցությունը պահպանվում է, իսկ դրանց build-երը ստուգվում են առանձին՝ CI-ից դուրս։ Workflow-ի առկայությունը դեռ build-ի հաջողության ապացույց չէ․ այս փոփոխությունների համար remote CI չի գործարկվել։
 
 ## Հարթակների վարք և զարգացման կանոն
 
