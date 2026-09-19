@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(29);
+select plan(31);
 
 select throws_ok($$insert into schools(name, timezone) values (' ', 'Asia/Yerevan')$$, '23514', null, 'blank school name rejected');
 select throws_ok($$insert into schools(name, timezone) values ('X', 'Mars/Olympus')$$, '23514', null, 'invalid timezone rejected');
@@ -13,6 +13,8 @@ select lives_ok($$insert into teachers(id,school_id,name) values ('aaaaaaaa-4000
 select throws_ok($$insert into lessons(school_id,class_id,weekday,time_slot_id,subject_id) values ('aaaaaaaa-0000-0000-0000-000000000001','aaaaaaaa-1000-0000-0000-000000000001',7,'aaaaaaaa-2000-0000-0000-000000000002','aaaaaaaa-3000-0000-0000-000000000001')$$, '23514', null, 'weekday outside 1..6 rejected');
 select throws_ok($$insert into time_slots(school_id,start_time,end_time) values ('aaaaaaaa-0000-0000-0000-000000000001','15:00','14:00')$$, '23514', null, 'reversed time rejected');
 select throws_ok($$insert into time_slots(school_id,start_time,end_time) values ('aaaaaaaa-0000-0000-0000-000000000001','15:00:01','16:00')$$, '23514', null, 'second precision rejected');
+select throws_ok($$insert into time_slots(school_id,start_time,end_time) values ('aaaaaaaa-0000-0000-0000-000000000001','23:00','24:00')$$, '23514', null, 'midnight end time rejected');
+select lives_ok($$insert into time_slots(id,school_id,start_time,end_time) values ('aaaaaaaa-2000-0000-0000-000000000098','aaaaaaaa-0000-0000-0000-000000000001','23:30','23:59')$$, 'latest legal end time allowed');
 select throws_ok($$insert into time_slots(school_id,start_time,end_time) values ('aaaaaaaa-0000-0000-0000-000000000001','09:30','10:00')$$, '23P01', null, 'partial slot overlap rejected');
 select throws_ok($$insert into time_slots(school_id,start_time,end_time) values ('aaaaaaaa-0000-0000-0000-000000000001','09:10','09:20')$$, '23P01', null, 'nested slot overlap rejected');
 select throws_ok($$insert into time_slots(school_id,start_time,end_time) values ('aaaaaaaa-0000-0000-0000-000000000001','09:00','09:45')$$, '23P01', null, 'same slot interval rejected');

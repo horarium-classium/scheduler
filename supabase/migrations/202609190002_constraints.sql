@@ -6,6 +6,7 @@ alter table public.lessons add constraint lessons_weekday_check check (weekday b
 alter table public.lessons add constraint lessons_cell_key unique (school_id, class_id, weekday, time_slot_id);
 create unique index lessons_teacher_slot_key on public.lessons (school_id, teacher_id, weekday, time_slot_id) where teacher_id is not null;
 alter table public.time_slots add constraint time_slots_order_check check (start_time < end_time);
+alter table public.time_slots add constraint time_slots_end_before_midnight_check check (end_time <= '23:59');
 alter table public.time_slots add constraint time_slots_minute_precision_check check (extract(second from start_time) = 0 and extract(second from end_time) = 0);
 alter table public.time_slots add constraint time_slots_no_overlap exclude using gist (
   school_id with =,
