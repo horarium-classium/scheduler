@@ -1,5 +1,5 @@
 import "./style.css";
-import { isTimeSlotUsed, nextId, removeClassDraft, sortTimeSlots, validateTimeSlot, type SchoolClass, type Subject, type Teacher, type TimeSlot } from "./model";
+import { findLessonConflict, isTimeSlotUsed, nextId, removeClassDraft, sortTimeSlots, validateTimeSlot, type SchoolClass, type Subject, type Teacher, type TimeSlot } from "./model";
 import { SCHEMA_VERSION, STORAGE_KEY, completeMigration, isValidTimezone, loadState, saveState, type TeacherState } from "./storage";
 
 interface Weekday { id: number; name: string; shortName: string; }
@@ -206,16 +206,36 @@ function openLessonDialog(classId: number, weekdayId: number, timeSlotId: number
   const lesson = state.lessons.find((item) => item.classId === classId && item.weekday === weekdayId && item.timeSlotId === timeSlotId); if (!schoolClass || !weekday || !slot) return;
   const dialog = document.createElement("dialog"); dialog.className = "lesson-dialog"; dialog.innerHTML = `<form method="dialog" class="dialog-form" novalidate><header><h2></h2><button class="dialog-close cancel-dialog" type="button" aria-label="Փակել">×</button></header><div class="no-subjects" hidden><p>Դաս ավելացնելու համար նախ ստեղծեք առարկա։</p><button class="primary-button subject-settings-link" type="button">Ավելացնել առարկա</button></div><label class="subject-field">Առարկա<select name="subject" required></select></label><label class="teacher-field">Ուսուցիչ<select name="teacher"><option value="">Նշված չէ</option></select></label><label>Մեկնաբանություն<textarea name="comment" rows="3"></textarea></label><p class="form-error" role="alert"></p><footer><button class="danger-button delete-button" type="button" ${lesson ? "" : "hidden"}>Ջնջել</button><span></span><button class="secondary-button cancel-dialog" type="button">Չեղարկել</button><button class="primary-button save-lesson" type="submit">Պահել</button></footer></form>`; document.body.append(dialog);
   const heading = dialog.querySelector("h2"); if (heading) heading.textContent = `${schoolClass.name} — ${weekday.name} ${slot.start}–${slot.end}`;
+  let conflictTarget: number | null = null;
   const form = dialog.querySelector<HTMLFormElement>("form"); const subject = dialog.querySelector<HTMLSelectElement>('[name="subject"]'); const teacher = dialog.querySelector<HTMLSelectElement>('[name="teacher"]'); const comment = dialog.querySelector<HTMLTextAreaElement>('[name="comment"]'); const error = dialog.querySelector(".form-error");
   for (const item of state.subjects) { const option = document.createElement("option"); option.value = String(item.id); option.textContent = item.name; option.selected = item.id === lesson?.subjectId; subject?.append(option); }
   for (const item of state.teachers) { const option = document.createElement("option"); option.value = String(item.id); option.textContent = item.name; option.selected = item.id === lesson?.teacherId; teacher?.append(option); }
   if (comment) comment.value = lesson?.comment ?? "";
   if (!state.subjects.length) { dialog.querySelector<HTMLElement>(".no-subjects")!.hidden = false; dialog.querySelector<HTMLElement>(".subject-field")!.hidden = true; dialog.querySelector<HTMLButtonElement>(".save-lesson")!.disabled = true; }
   dialog.querySelector(".subject-settings-link")?.addEventListener("click", () => { pendingCell = { classId, weekdayId, timeSlotId }; dialog.close("settings"); });
-  form?.addEventListener("submit", (event) => { event.preventDefault(); const subjectId = Number(subject?.value); const subjectExists = state.subjects.some((item) => item.id === subjectId); if (!subjectExists) { if (error) error.textContent = "Ընտրեք առարկա։"; subject?.focus(); return; } const teacherId = teacher?.value ? Number(teacher.value) : null; if (teacherId !== null && !state.teachers.some((item) => item.id === teacherId)) { if (error) error.textContent = "Ընտրված ուսուցիչը գոյություն չունի։"; return; } if (lesson) { lesson.subjectId = subjectId; lesson.teacherId = teacherId; lesson.comment = comment?.value.trim() ?? ""; } else state.lessons.push({ id: nextId(state.lessons), classId, weekday: weekdayId, timeSlotId, subjectId, teacherId, comment: comment?.value.trim() ?? "" }); persist(); dialog.close("changed"); });
+  form?.addEventListener("submit", (event) => { event.preventDefault(); const subjectId = Number(subject?.value); const subjectExists = state.subjects.some((item) => item.id === subjectId); if (!subjectExists) { if (error) error.textContent = "Ընտրեք առարկա։"; subject?.focus(); return; } const teacherId = teacher?.value ? Number(teacher.value) : null; if (teacherId !== null && !state.teachers.some((item) => item.id === teacherId)) { if (error) error.textContent = "Ընտրված ուսուցիչը գոյություն չունի։"; return; }
+    const candidate = { id: lesson?.id ?? nextId(state.lessons), classId, weekday: weekdayId, timeSlotId, subjectId, teacherId, comment: comment?.value.trim() ?? "" };
+    const conflict = findLessonConflict(candidate, state.lessons);
+    error?.replaceChildren();
+    if (conflict) {
+      const other = conflict.lesson;
+      const otherClass = state.classes.find((item) => item.id === other.classId);
+      const otherSubject = state.subjects.find((item) => item.id === other.subjectId);
+      const teacherName = state.teachers.find((item) => item.id === teacherId)?.name ?? "Ուսուցիչը";
+      if (error) {
+        error.textContent = conflict.kind === "cell" ? "Այս վանդակում արդեն դաս կա։" : `${teacherName}ը այս ժամին արդեն դաս ունի․ ${otherClass?.name} · ${weekday.name} · ${slot.start}–${slot.end} · ${otherSubject?.name}։ Փոփոխությունը չի պահպանվել։`;
+        const open = document.createElement("button");
+        open.type = "button"; open.className = "secondary-button";
+        open.textContent = `Բացել ${otherClass?.name ?? "դասարանը"} (չեղարկել այս փոփոխությունը)`;
+        open.addEventListener("click", () => { conflictTarget = other.classId; dialog.close("conflict"); });
+        error.append(document.createElement("br"), open);
+      }
+      return;
+    }
+ if (lesson) { lesson.subjectId = subjectId; lesson.teacherId = teacherId; lesson.comment = comment?.value.trim() ?? ""; } else state.lessons.push({ id: nextId(state.lessons), classId, weekday: weekdayId, timeSlotId, subjectId, teacherId, comment: comment?.value.trim() ?? "" }); persist(); dialog.close("changed"); });
   dialog.querySelector(".delete-button")?.addEventListener("click", () => { if (lesson) state.lessons.splice(state.lessons.indexOf(lesson), 1); persist(); dialog.close("changed"); });
   dialog.querySelectorAll(".cancel-dialog").forEach((button) => button.addEventListener("click", () => dialog.close("cancel")));
-  dialog.addEventListener("close", () => { const changed = dialog.returnValue === "changed"; const goToSettings = dialog.returnValue === "settings"; dialog.remove(); if (changed) renderWorkspace(); if (goToSettings) { page = "settings"; renderApp(); requestAnimationFrame(() => document.querySelector("#add-subject")?.scrollIntoView({ block: "center" })); return; } requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${weekdayId}"][data-time-slot="${timeSlotId}"]`)?.focus() ?? returnFocus.focus()); });
+  dialog.addEventListener("close", () => { const changed = dialog.returnValue === "changed"; const goToSettings = dialog.returnValue === "settings"; dialog.remove(); if (dialog.returnValue === "conflict" && conflictTarget !== null) { state.lastSelectedClassId = conflictTarget; page = "workspace"; persist(); renderApp(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${weekdayId}"][data-time-slot="${timeSlotId}"]`)?.focus()); return; } if (changed) renderWorkspace(); if (goToSettings) { page = "settings"; renderApp(); requestAnimationFrame(() => document.querySelector("#add-subject")?.scrollIntoView({ block: "center" })); return; } requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${weekdayId}"][data-time-slot="${timeSlotId}"]`)?.focus() ?? returnFocus.focus()); });
   dialog.showModal(); subject?.focus();
 }
 

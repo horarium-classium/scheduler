@@ -39,3 +39,25 @@ export function removeClassDraft(
     nextSelectedClassId: remainingClasses[index]?.id ?? remainingClasses[index - 1]?.id ?? null,
   };
 }
+
+export interface LessonConflict {
+  kind: "cell" | "teacher";
+  lesson: Lesson;
+}
+
+// Compare stable entity IDs, never names or formatted times. Exclude the edited lesson.
+export function findLessonConflict(candidate: Lesson, lessons: readonly Lesson[]): LessonConflict | null {
+  for (const lesson of lessons) {
+    if (lesson.id === candidate.id || lesson.weekday !== candidate.weekday || lesson.timeSlotId !== candidate.timeSlotId) continue;
+    if (lesson.classId === candidate.classId) return { kind: "cell", lesson };
+    if (candidate.teacherId !== null && lesson.teacherId === candidate.teacherId) return { kind: "teacher", lesson };
+  }
+  return null;
+}
+
+export function findScheduleConflicts(lessons: readonly Lesson[]): LessonConflict[] {
+  return lessons.flatMap((lesson, index) => {
+    const conflict = findLessonConflict(lesson, lessons.slice(0, index));
+    return conflict ? [conflict] : [];
+  });
+}

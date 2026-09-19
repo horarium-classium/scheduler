@@ -1,4 +1,4 @@
-import { nextId, validateTimeSlot, type Lesson, type SchoolClass, type Subject, type Teacher, type TimeSlot } from "./model.ts";
+import { findScheduleConflicts, nextId, validateTimeSlot, type Lesson, type SchoolClass, type Subject, type Teacher, type TimeSlot } from "./model.ts";
 
 export const STORAGE_KEY = "horarium-teacher-workspace";
 export const STORAGE_BACKUP_KEY = "horarium-teacher-workspace-v1-backup";
@@ -44,6 +44,7 @@ export function validateState(value: unknown): string | null {
   for (const item of value.teachers) if (!isRecord(item) || item.schoolId !== 1 || typeof item.name !== "string" || !item.name.trim()) return "Ուսուցիչներից մեկի կառուցվածքն անվավեր է։";
   const classIds = new Set((value.classes as Record<string, unknown>[]).map((item) => item.id)); const slotIds = new Set((value.timeSlots as Record<string, unknown>[]).map((item) => item.id)); const subjectIds = new Set((value.subjects as Record<string, unknown>[]).map((item) => item.id)); const teacherIds = new Set((value.teachers as Record<string, unknown>[]).map((item) => item.id)); const cells = new Set<string>();
   for (const item of value.lessons as unknown[]) { if (!isRecord(item) || !classIds.has(item.classId) || !slotIds.has(item.timeSlotId) || !subjectIds.has(item.subjectId) || (item.teacherId !== null && !teacherIds.has(item.teacherId)) || !Number.isInteger(item.weekday) || Number(item.weekday) < 1 || Number(item.weekday) > 6 || typeof item.comment !== "string") return "Դասերից մեկի կառուցվածքը կամ կապերն անվավեր են։"; const cell = `${item.classId}:${item.weekday}:${item.timeSlotId}`; if (cells.has(cell)) return "Նույն վանդակում մեկից ավելի դաս կա։"; cells.add(cell); }
+  if (findScheduleConflicts(value.lessons as Lesson[]).length) return "Նույն ուսուցիչը նույն օրը և դասաժամին նշանակված է մի քանի դասարանում։";
   if (value.lastSelectedClassId !== null && (!Number.isInteger(value.lastSelectedClassId) || !classIds.has(value.lastSelectedClassId))) return "Վերջին ընտրված դասարանը գոյություն չունի։";
   return null;
 }
