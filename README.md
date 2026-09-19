@@ -126,6 +126,16 @@ npm run tauri build
 
 Արդյունքները՝ `apps/student/src-tauri/target/release/bundle/`։ Ստորագրումն ու տարածումը այս աշխատանքի մաս չեն։ [Windows MSI CI-ն](.github/workflows/desktop.yml) կատարում է թեստերը, Rust check-ը և միայն Windows MSI build-ը՝ push/PR կամ ձեռքով գործարկման ժամանակ։ `horarium-windows-msi` artifact-ը պարունակում է միայն `.msi` ֆայլերը։ macOS/Linux աջակցությունը պահպանվում է, իսկ դրանց build-երը ստուգվում են առանձին՝ CI-ից դուրս։ Workflow-ի առկայությունը դեռ build-ի հաջողության ապացույց չէ․ այս փոփոխությունների համար remote CI չի գործարկվել։
 
+### GitHub Release
+
+Պաշտոնական Windows ռելիզ ստեղծելու համար՝
+
+1. `apps/student/package.json` և `apps/student/src-tauri/tauri.conf.json` ֆայլերում սահմանել նույն `x.y.z` տարբերակը։
+2. Փոփոխությունները միացնել `master`-ին։
+3. Ստեղծել և ուղարկել նույն տարբերակի `vX.Y.Z` tag-ը, օրինակ՝ `git tag v0.1.0`, ապա `git push origin v0.1.0`։
+
+[`Windows release`](.github/workflows/release.yml) workflow-ը ստուգում է tag-ի և երկու config-ների տարբերակների համընկնումը, անցկացնում է ավտոմատ ստուգումները, կառուցում MSI-ն և ստեղծում GitHub Release՝ ավտոմատ release notes-ով։ Չհամընկնող տարբերակների դեպքում հրապարակումը կանգնում է մինչև installer-ի կառուցումը։ Միևնույն tag-ի երկու զուգահեռ գործարկում չի չեղարկում արդեն սկսված ռելիզը։ Ներկայում GitHub Release-ին կցվում է միայն Windows MSI-ն. macOS/Linux փաթեթների հրապարակումը դեռ առանձին աշխատանք է։
+
 ## Հարթակների վարք և զարգացման կանոն
 
 Նոր փոփոխությունները պետք է պահպանեն Windows/macOS/Linux աջակցությունը։ Օգտագործեք Tauri-ի cross-platform API-ները, platform-neutral անվանումները և application-data/config path resolver-ները։ Անհրաժեշտ OS տարբերությունները պահեք փոքր adapter-ներում։ Այդ կանոնները ամրագրված են նաև [apps/student/AGENTS.md](apps/student/AGENTS.md)-ում։

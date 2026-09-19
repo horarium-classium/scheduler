@@ -22,6 +22,8 @@ Native փաթեթավորումը գործարկեք համապատասխան OS
 
 [Windows MSI CI](.github/workflows/desktop.yml)-ն աշխատում է միայն `windows-latest` runner-ով և արտահանում միայն MSI artifact։ macOS/Linux build-երը կատարվում են ձեռքով համապատասխան միջավայրերում։ CI-ն չի փորձում headless runner-ում հաստատել toast, tray, audio կամ speech վարքը։
 
+Ռելիզից առաջ տեղային ստուգել `npm run check:release-version -- vX.Y.Z` հրամանը։ Այն պետք է հաջողվի միայն այն դեպքում, երբ tag-ի տարբերակը համընկնում է և՛ `package.json`-ի, և՛ `src-tauri/tauri.conf.json`-ի տարբերակներին։ Tag-ի push-ից հետո ստուգել, որ `Windows release` workflow-ը հաջող է, GitHub Release-ը ստեղծվել է, իսկ կցված MSI-ն ներբեռնվում և տեղադրվում է Windows-ում։
+
 TypeScript թեստերը ծածկում են validation/cache/timeout/refresh, current-next summary և speech-ի բացակայությունը։ Rust թեստերը՝ scheduler-ի նախազգուշացում, ավարտի հատում, հաջորդ դաս, կրկնությունների կանխում, sleep/wake/կեսգիշեր, JSON persistence և sound-disabled վարք։ Bundled PCM ֆորմատն ու audio sample-ները ստուգվում են առանց ֆիզիկական audio device-ի։
 
 ## Ընդհանուր functional checklist
