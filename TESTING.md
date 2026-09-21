@@ -20,7 +20,7 @@ Native փաթեթավորումը գործարկեք համապատասխան OS
 | macOS | `npm run tauri build -- --bundles app,dmg` |
 | Ubuntu/Xubuntu | `npm run tauri build -- --bundles deb,appimage` |
 
-[Windows MSI CI](.github/workflows/desktop.yml)-ն աշխատում է միայն `windows-latest` runner-ով և արտահանում միայն MSI artifact։ macOS/Linux build-երը կատարվում են ձեռքով համապատասխան միջավայրերում։ CI-ն չի փորձում headless runner-ում հաստատել toast, tray, audio կամ speech վարքը։
+Սովորական push/PR-ի համար GitHub Actions չի գործարկվում։ `vX.Y.Z` tag-ի push-ից [Windows release](.github/workflows/release.yml)-ը `windows-latest` runner-ում կատարում է ստուգումները, կառուցում միայն NSIS installer և կցում GitHub Release-ին։ Ռելիզից առաջ տեղային գործարկել `npm run check:release-version -- vX.Y.Z` և համոզվել, որ tag-ի տարբերակը համընկնում է `package.json`-ի ու `src-tauri/tauri.conf.json`-ի տարբերակներին։ CI-ն չի փորձում headless runner-ում հաստատել toast, tray, audio կամ speech վարքը։
 
 Ռելիզից առաջ տեղային ստուգել `npm run check:release-version -- vX.Y.Z` հրամանը։ Այն պետք է հաջողվի միայն այն դեպքում, երբ tag-ի տարբերակը համընկնում է և՛ `package.json`-ի, և՛ `src-tauri/tauri.conf.json`-ի տարբերակներին։ Tag-ի push-ից հետո ստուգել, որ `Windows release` workflow-ը հաջող է, GitHub Release-ը ստեղծվել է, իսկ կցված MSI-ն ներբեռնվում և տեղադրվում է Windows-ում։
 
@@ -46,7 +46,7 @@ TypeScript թեստերը ծածկում են validation/cache/timeout/refresh, 
 
 OS/version/architecture, build revision և ամսաթիվ՝ **չստուգված**։
 
-- [ ] MSI/NSIS build, install, launch, uninstall և WebView2 առկայություն։
+- [ ] NSIS build, առանց administrator իրավունքի current-user install, launch, uninstall և WebView2 առկայություն։
 - [ ] Նոր գիրք/ժամացույց icon-ը երևում է installer-ում, Start/taskbar-ում և tray-ում՝ light/dark theme ու տարբեր scaling-ով։
 - [ ] Native system notification՝ նախազգուշացում, ավարտ, ընթացող դասի ընթացքում startup և duplicate suppression։ Ստուգել notification permissions/Do Not Disturb-ը։
 - [ ] System tray՝ Close → hide, Open, Refresh, կարգավորումների անջատիչներ, Quit։

@@ -1,0 +1,15 @@
+{
+  "name": "horarium-classium",
+  "private": true,
+  "scripts": {
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset --local",
+    "supabase:test": "supabase test db --db-url postgresql://supabase_admin:postgres@127.0.0.1:54322/postgres",
+    "supabase:lint": "supabase db lint --local --fail-on error",
+    "supabase:verify": "npm run supabase:reset && npm run supabase:test && npm run supabase:lint"
+  },
+  "devDependencies": {
+    "supabase": "2.117.0"
+  }
+}

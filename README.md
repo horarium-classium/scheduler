@@ -1,7 +1,5 @@
 # Դասացուցակ — Horarium Classium
 
-[![Windows MSI](https://github.com/armenbadal/horarium-classium/actions/workflows/desktop.yml/badge.svg?branch=master)](https://github.com/armenbadal/horarium-classium/actions/workflows/desktop.yml)
-
 Windows, macOS և Linux (Ubuntu/Xubuntu family) հարթակների փոքր desktop utility՝ օրվա դասերը տեսնելու և դասերի մեկնարկից ու ավարտից տեղեկանալու համար։ Հավելվածը կառուցված է TypeScript + Vanilla HTML/CSS, Tauri 2 և Rust տեխնոլոգիաներով։ Դասացուցակը բեռնվում է frontend-ում, իսկ հիշեցումների scheduler-ը աշխատում է Rust-ում՝ անկախ թաքնված պատուհանի timer-ից։
 
 ## Հնարավորություններ
@@ -124,7 +122,17 @@ npm run tauri build
 | macOS | `npm run tauri build -- --bundles app,dmg` | `.app`, `.dmg` |
 | Ubuntu/Xubuntu | `npm run tauri build -- --bundles deb,appimage` | `.deb`, `.AppImage` |
 
-Արդյունքները՝ `apps/student/src-tauri/target/release/bundle/`։ Ստորագրումն ու տարածումը այս աշխատանքի մաս չեն։ [Windows MSI CI-ն](.github/workflows/desktop.yml) կատարում է թեստերը, Rust check-ը և միայն Windows MSI build-ը՝ push/PR կամ ձեռքով գործարկման ժամանակ։ `horarium-windows-msi` artifact-ը պարունակում է միայն `.msi` ֆայլերը։ macOS/Linux աջակցությունը պահպանվում է, իսկ դրանց build-երը ստուգվում են առանձին՝ CI-ից դուրս։ Workflow-ի առկայությունը դեռ build-ի հաջողության ապացույց չէ․ այս փոփոխությունների համար remote CI չի գործարկվել։
+Արդյունքները՝ `apps/student/src-tauri/target/release/bundle/`։ Սովորական branch push-երի և pull request-ների համար GitHub Actions չի գործարկվում։ macOS/Linux build-երը կատարվում են ձեռքով համապատասխան միջավայրերում։
+
+### Windows release
+
+Պաշտոնական Windows ռելիզ ստեղծելու համար՝
+
+1. `apps/student/package.json` և `apps/student/src-tauri/tauri.conf.json` ֆայլերում սահմանել նույն `x.y.z` տարբերակը։
+2. Փոփոխությունները միացնել հիմնական branch-ին։
+3. Ստեղծել և ուղարկել նույն տարբերակի tag-ը, օրինակ՝ `git tag v0.1.0`, ապա `git push origin v0.1.0`։
+
+[`Windows release`](.github/workflows/release.yml) workflow-ը գործարկվում է միայն `vX.Y.Z` tag-ի push-ից։ Այն ստուգում է tag-ի և երկու config-ների տարբերակների համընկնումը, անցկացնում է ավտոմատ ստուգումները, կառուցում NSIS `-setup.exe` installer և ստեղծում GitHub Release՝ ավտոմատ release notes-ով։ NSIS-ը բացահայտ կարգավորված է `currentUser` ռեժիմով․ հավելվածը տեղադրվում է տվյալ օգտատիրոջ `%LOCALAPPDATA%` պանակում և administrator իրավունք չի պահանջում։ MSI չի կառուցվում և սովորական push-ից workflow չի գործարկվում։
 
 ### GitHub Release
 
