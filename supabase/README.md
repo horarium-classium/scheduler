@@ -1,6 +1,6 @@
 # Local Supabase foundation
 
-Այս պանակը Teacher-ի ապագա ամպային շերտի database source of truth-ն է։ Այս փուլում frontend-ը շարունակում է աշխատել browser-ի տեղային պահոցով և Supabase չի կարդում կամ գրում։
+Այս պանակը Teacher-ի ապագա ամպային շերտի database source of truth-ն է։ Teacher frontend-ը նույնականացված օգտատիրոջ դպրոցի տվյալները կարդում և գրում է ամպային workspace RPC-ներով։
 
 ## Պահանջներ
 
@@ -51,9 +51,10 @@ Seed-ը ստեղծում է երկու դպրոց, երկու դպրոցներո
 - `migrations/202609190001_school_schema.sql` — աղյուսակներ, UUID կապեր և indexes։
 - `migrations/202609190002_constraints.sql` — database invariants, overlap/occupancy constraints և lifecycle triggers։
 - `migrations/202609190003_access_policies.sql` — grants, RLS և membership helpers։
+- `migrations/202609230001_teacher_workspace.sql` — ամբողջական snapshot read և atomic change-set save՝ RLS-ով, դպրոցի գրառումների serialization-ով և stale-version ստուգմամբ։
 - `seed.sql` — միայն local Auth/data fixtures։
 - `tests/` — pgTAP schema, constraint, RLS և երկու-connection concurrency ստուգումներ։
 
 RLS-ը anonymous draft հասանելիություն չի տալիս։ Admin-ը կառավարում է դպրոցի կարգավորումներն ու դասաժամերը, scheduler-ը՝ դասարանները, առարկաները, ուսուցիչներն ու դասերը։ Membership-ի փոփոխությունը և publication write-ը client դերերին փակ են։ Service-role key repository-ում կամ frontend-ում չկա։
 
-Հաջորդ փուլում առանձին պետք է կատարվեն hosted development project-ի վերահսկվող կապումը, Teacher Auth/data adapter-ը և browser-ի տեղային տվյալների ներմուծումը։ Publish RPC-ն ու Student public read contract-ը նույնպես այս հիմքի մաս չեն։
+Hosted կապը և Teacher Auth/data adapter-ը իրականացված են։ Browser-ի տեղային տվյալների ներմուծումն առանձին հաջորդ աշխատանք է։ Publish RPC-ն ու Student public read contract-ը նույնպես այս հիմքի մաս չեն։

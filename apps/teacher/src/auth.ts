@@ -1,17 +1,23 @@
 import "./style.css";
 import { createClient } from "@supabase/supabase-js";
+import { CloudWorkspace, cloudError } from "./cloud-workspace";
 
-// Public browser configuration, also used by the existing invitation page.
-const url = import.meta.env.VITE_SUPABASE_URL || "https://soqjiqvapluubkibzrut.supabase.co";
-const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_dsVeNj0g2m2ww_gWMosO4g_5_jk6Tzy";
 const app = document.querySelector<HTMLDivElement>("#app")!;
+const url = import.meta.env.VITE_SUPABASE_URL?.trim();
+const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
+if (!url || !key) {
+  app.innerHTML = `<main class="auth-page"><section class="auth-card"><h1>Կարգավորումը բացակայում է</h1><p role="alert">Supabase-ի հանրային հասցեն կամ publishable key-ը չի փոխանցվել build-ին։</p></section></main>`;
+  throw new Error("Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY");
+}
 const client = createClient(url, key, { auth: { detectSessionInUrl: false } });
 let revision = 0;
 let currentUser: string | null = null;
 let disposeEditor: (() => void) | null = null;
 let accountBar: HTMLElement | null = null;
+let workspaceGeneration = 0;
 
 function clearEditor(): void {
+  ++workspaceGeneration;
   disposeEditor?.();
   disposeEditor = null;
   currentUser = null;
@@ -54,9 +60,6 @@ async function authenticate(ticket: number): Promise<void> {
     if (error || !data.user) { login("Նույնականացումը չհաջողվեց։ Խնդրում ենք կրկին մուտք գործել։"); return; }
     if (currentUser === data.user.id) return;
     clearEditor();
-    const { mountEditor } = await import("./main");
-    if (ticket !== revision) return;
-    disposeEditor = mountEditor(data.user.id);
     currentUser = data.user.id;
     accountBar = document.createElement("header");
     accountBar.className = "account-bar";
@@ -64,10 +67,8 @@ async function authenticate(ticket: number): Promise<void> {
     const button = document.createElement("button"); button.className = "secondary-button"; button.textContent = "Ելք";
     const status = document.createElement("span"); status.setAttribute("role", "alert");
     accountBar.append(email, status, button); app.before(accountBar);
-    if (window.localStorage.getItem("horarium-teacher-workspace")) {
-      status.textContent = "Նախկին տեղային տվյալները պահպանված են առանձին․ ներմուծումը դեռ հասանելի չէ։";
-    }
     button.addEventListener("click", async () => {
+      if (!window.dispatchEvent(new Event("teacher-before-leave", { cancelable: true }))) return;
       button.disabled = true;
       try {
         const { error } = await client.auth.signOut({ scope: "local" });
@@ -75,9 +76,63 @@ async function authenticate(ticket: number): Promise<void> {
         ++revision; login();
       } catch { status.textContent = "Ելքը չհաջողվեց։ Կրկին փորձեք։"; button.disabled = false; }
     });
+    void loadSchools(data.user.id, workspaceGeneration);
   } catch {
     if (ticket === revision) login("Սերվերի հետ կապը չհաջողվեց։ Կրկին փորձեք։");
   }
+}
+
+async function loadSchools(userId: string, generation: number): Promise<void> {
+  app.innerHTML = `<main class="auth-page"><p role="status">Բեռնում ենք դպրոցը…</p></main>`;
+  try {
+    const { data, error } = await client.from("school_members").select("school_id, role, schools(id, name)").eq("user_id", userId);
+    if (generation !== workspaceGeneration) return;
+    if (error) throw error;
+    if (!data?.length) {
+      workspaceMessage("Ձեր հաշիվը դեռ կապված չէ դպրոցի հետ։ Դիմեք ադմինիստրատորին։", () => void loadSchools(userId, generation));
+      return;
+    }
+    const schools = data.map(member => {
+      const school = member.schools as unknown as { id: string; name: string } | null;
+      if (!school || school.id !== member.school_id || !["admin", "scheduler"].includes(member.role)) throw new Error("Դպրոցի անդամակցության տվյալներն անվավեր են։");
+      return { id: school.id, name: school.name, role: member.role as "admin" | "scheduler" };
+    });
+    const open = async (school: typeof schools[number]): Promise<void> => {
+      app.innerHTML = `<main class="auth-page"><p role="status">Բեռնում ենք դասացուցակը…</p></main>`;
+      try {
+        const read = async (): Promise<unknown> => {
+          const result = await client.rpc("teacher_workspace_read", { p_school: school.id });
+          if (result.error) throw result.error; return result.data;
+        };
+        const workspace = new CloudWorkspace(school.id, await read(), {
+          read,
+          save: async (version, changes) => {
+            const result = await client.rpc("teacher_workspace_save", { p_school: school.id, p_version: version, p_changes: changes });
+            if (result.error) throw result.error; return result.data;
+          },
+        });
+        const initial = workspace.decode();
+        const { mountEditor } = await import("./main");
+        if (generation !== workspaceGeneration) return;
+        disposeEditor = mountEditor(workspace, initial, school.role);
+      } catch (error) {
+        if (generation === workspaceGeneration) workspaceMessage(cloudError(error), () => void loadSchools(userId, generation));
+      }
+    };
+    if (schools.length === 1) { await open(schools[0]!); return; }
+    app.innerHTML = `<main class="auth-page"><section class="auth-card"><h1>Ընտրեք դպրոցը</h1><div class="school-choices"></div></section></main>`;
+    for (const school of schools) {
+      const button = document.createElement("button"); button.className = "secondary-button"; button.textContent = school.name;
+      button.addEventListener("click", () => void open(school)); app.querySelector(".school-choices")!.append(button);
+    }
+  } catch (error) {
+    if (generation === workspaceGeneration) workspaceMessage(cloudError(error), () => void loadSchools(userId, generation));
+  }
+}
+function workspaceMessage(message: string, retry: () => void): void {
+  app.innerHTML = `<main class="auth-page"><section class="auth-card"><h1>Դպրոցի տվյալները հասանելի չեն</h1><p role="alert"></p><button class="primary-button">Կրկին փորձել</button></section></main>`;
+  app.querySelector("p")!.textContent = message;
+  app.querySelector("button")!.addEventListener("click", retry);
 }
 
 app.innerHTML = `<main class="auth-page"><p role="status">Ստուգում ենք մուտքը…</p></main>`;

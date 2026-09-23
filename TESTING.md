@@ -120,3 +120,13 @@ Icon-երի փոխարինումից հետո առանձին անցել են `np
 ### «Կաքավիկ» զանգ
 
 - Windows, macOS և Ubuntu/Xubuntu հարթակներից յուրաքանչյուրում փորձնական ծանուցմամբ հաստատել, որ հնչում է «Կաքավիկ»-ի 6 նոտանոց մոտիվը՝ մոտ 2 վայրկյան, առանց կտտոցների։ Կրկնել թաքնված պատուհանով և «Ձայն» անջատված վիճակում։
+
+## Teacher cloud workspace — 2026-09-23
+
+- Node.js/macOS: 18 current unit tests passed, including UUID mapping, validation, serialized saves, retries, and signout disposal. Obsolete localStorage migration tests were removed with the retired local storage code.
+- Pages production build passed.
+- Local Supabase: all 110 pgTAP assertions passed (including 16 new workspace checks); database lint passed.
+- Local HTTP API: authenticated membership lookup, cloud adapter save, second-client read, stale-write rejection, and test-data cleanup passed.
+- Hosted: workspace migration applied without seeds; existing «Տնային դպրոց» membership linked to the confirmed user.
+- Browser visual/end-to-end interaction check remains unverified: browser tool could not verify its admin-enforced policy.
+- Real published Teacher UI needs deployment and the manual checks in `apps/teacher/README.md`.

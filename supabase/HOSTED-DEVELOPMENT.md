@@ -9,10 +9,10 @@ API URL: https://soqjiqvapluubkibzrut.supabase.co
 
 ## Applied and verified
 
-- Three repository migrations applied, without seed data or test users.
+- Four repository migrations applied, including `202609230001_teacher_workspace.sql`, without seed data or test users.
 - Local/remote migration history matches; remote database lint passed.
 - Auth public signup disabled; site URL is https://armenbadal.github.io/horarium-classium/. Redirects retain the local development URLs and allow https://armenbadal.github.io/horarium-classium/activate.html. Updated 2026-09-23; other hosted Auth settings were left unchanged.
-- Teacher still uses localStorage. No cloud login UI, data adapter, import, publication RPC or Student integration yet.
+- Teacher Auth is verified by the user. The cloud data adapter and workspace RPCs are implemented; the frontend changes require publication. No local import, publication RPC or Student integration yet.
 
 ## Credentials
 
@@ -40,8 +40,8 @@ npx supabase config push --project-ref soqjiqvapluubkibzrut --workdir supabase/e
 
 Inspect declared updates before pushing. Do not push the root local config: it enables local test signup.
 
-Next: create the real development administrator account and school membership, then implement Teacher authentication and cloud persistence. Import local data as a separate backed-up operation; do not use local seed accounts remotely.
+The confirmed user account is linked as admin of the existing «Տնային դպրոց» (`ea6de536-fe82-48bf-8635-c2118cc56751`). No duplicate school was created. Import local data as a separate backed-up operation; do not use local seed accounts remotely.
 
 ## Account recreation — 2026-09-23
 
-The requested existing Auth account was deleted and a fresh invitation sent to the same email. Activation is pending. Account deletion cascades to its profile and school memberships; those are not automatically restored for the new user ID.
+The requested existing Auth account was deleted and a fresh invitation sent to the same email. Activation and login/logout were subsequently verified. Account deletion cascaded to its old memberships; the new account has now been explicitly linked to «Տնային դպրոց» as admin.

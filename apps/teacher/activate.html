@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="hy">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>Ակտիվացնել հաշիվը</title>
+    <style>body{font:16px system-ui;background:#f3f4f6;color:#1f2937;margin:0}main{max-width:440px;margin:8vh auto;padding:28px;background:white;border-radius:12px}label{display:grid;gap:8px;margin:20px 0}input,button{font:inherit;padding:10px}button{cursor:pointer}#status{white-space:pre-wrap}a{color:#2563eb}</style>
+  </head>
+  <body>
+    <main><h1>Ակտիվացնել հաշիվը</h1><p id="status" role="status">Ստուգում ենք հրավերը…</p><form hidden><label>Նոր գաղտնաբառ<input name="password" type="password" minlength="12" autocomplete="new-password" required></label><label>Կրկնել գաղտնաբառը<input name="confirmation" type="password" minlength="12" autocomplete="new-password" required></label><button>Պահպանել գաղտնաբառը</button></form><p id="done" hidden>Հաշիվն ակտիվացված է։ <a href="./">Մուտք գործել Teacher</a>։</p></main>
+    <script type="module">
+      const base = "%VITE_SUPABASE_URL%";
+      const apiKey = "%VITE_SUPABASE_PUBLISHABLE_KEY%";
+      const params = new URLSearchParams(location.hash.slice(1));
+      let token = params.get("access_token");
+      const linkError = params.get("error_description");
+      history.replaceState(null, "", location.pathname);
+      const status = document.querySelector("#status"), form = document.querySelector("form"), button = form.querySelector("button");
+      async function auth(path, options = {}) {
+        const response = await fetch(base + "/auth/v1/" + path, { ...options, headers: { apikey: apiKey, Authorization: "Bearer " + token, "Content-Type": "application/json" }, cache: "no-store" });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.msg || body.message || "Գործողությունը չհաջողվեց։");
+        return body;
+      }
+      if (!token || linkError) status.textContent = "Հրավերի հղումը բացակայում է կամ ժամկետանց է։ Բացեք email-ի հրավերը կամ խնդրեք նոր հրավեր։";
+      else {
+        try {
+          const user = await auth("user");
+          status.textContent = user.email + " — սահմանեք առնվազն 12 նիշ ունեցող գաղտնաբառ։";
+          form.hidden = false;
+        } catch {
+          token = null;
+          status.textContent = "Հրավերը չի ստուգվել։ Խնդրում ենք նորից բացել հրավերի հղումը։";
+        }
+      }
+      form.addEventListener("submit", async event => {
+        event.preventDefault();
+        const password = form.elements.namedItem("password").value;
+        const confirmation = form.elements.namedItem("confirmation").value;
+        if (password !== confirmation) { status.textContent = "Գաղտնաբառերը չեն համընկնում։"; return; }
+        button.disabled = true;
+        try {
+          await auth("user", { method: "PUT", body: JSON.stringify({ password }) });
+          token = null; form.reset(); form.hidden = true;
+          status.textContent = "Գաղտնաբառը պահպանված է։";
+          document.querySelector("#done").hidden = false;
+        } catch (error) { status.textContent = error.message; }
+        finally { button.disabled = false; }
+      });
+    </script>
+  </body>
+</html>

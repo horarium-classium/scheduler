@@ -199,3 +199,7 @@ button { cursor: pointer; }
 .auth-help { font-size: 13px; color: #64748b; }
 #auth-error { color: #b91c1c; margin: 0; }
 .account-bar { display: flex; align-items: center; justify-content: flex-end; gap: 16px; flex-wrap: wrap; padding: 10px 24px; background: white; border-bottom: 1px solid #e2e8f0; }
+
+.cloud-sync-bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:12px 24px; background:#eff6ff; border-bottom:1px solid #bfdbfe; }
+.cloud-sync-bar [role="status"] { flex:1; min-width:180px; }
+.school-choices { display:grid; gap:12px; }

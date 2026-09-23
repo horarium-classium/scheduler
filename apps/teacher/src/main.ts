@@ -1,11 +1,11 @@
 import "./style.css";
-import { findLessonConflict, isTimeSlotUsed, nextId, removeClassDraft, sortTimeSlots, validateTimeSlot, type SchoolClass, type Subject, type Teacher, type TimeSlot } from "./model";
-import { SCHEMA_VERSION, STORAGE_KEY, completeMigration, isValidTimezone, loadState, saveState, type TeacherState } from "./storage";
+import { findLessonConflict, isTimeSlotUsed, removeClassDraft, sortTimeSlots, validateTimeSlot, type SchoolClass, type Subject, type Teacher, type TimeSlot } from "./model";
+import { isValidTimezone, type TeacherState } from "./state";
+import { CloudWorkspace, SaveQueue } from "./cloud-workspace";
 
-import { accountStorage } from "./account-storage";
 
-export function mountEditor(userId: string): () => void {
-const localStorage = accountStorage(userId, window.localStorage);
+
+export function mountEditor(workspace: CloudWorkspace, initial: TeacherState, role: "admin" | "scheduler"): () => void {
 const controller = new AbortController();
 interface Weekday { id: number; name: string; shortName: string; }
 type Page = "workspace" | "settings" | "preview";
@@ -17,34 +17,43 @@ const weekdays: Weekday[] = [
   { id: 5, name: "Ուրբաթ", shortName: "Ուրբ" }, { id: 6, name: "Շաբաթ", shortName: "Շբ" },
 ];
 
-function createInitialState(): TeacherState {
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    school: { name: "Իմ դպրոցը", timezone: "Asia/Yerevan" },
-    classes: [{ id: 1, name: "5Ա" }, { id: 2, name: "5Բ" }, { id: 3, name: "6Ա" }],
-    subjects: [{ id: 1, schoolId: SCHOOL_ID, name: "Մաթեմատիկա", color: "#dbeafe" }, { id: 2, schoolId: SCHOOL_ID, name: "Հայոց լեզու", color: "#dcfce7" }],
-    teachers: [],
-    timeSlots: [
-      { id: 1, schoolId: SCHOOL_ID, start: "09:00", end: "09:45" }, { id: 2, schoolId: SCHOOL_ID, start: "10:00", end: "10:45" },
-      { id: 3, schoolId: SCHOOL_ID, start: "11:00", end: "11:45" }, { id: 4, schoolId: SCHOOL_ID, start: "12:00", end: "12:45" },
-      { id: 5, schoolId: SCHOOL_ID, start: "13:00", end: "13:45" }, { id: 6, schoolId: SCHOOL_ID, start: "14:00", end: "14:45" },
-    ],
-    lessons: [
-      { id: 1, classId: 1, weekday: 1, timeSlotId: 1, subjectId: 1, teacherId: null, comment: "" },
-      { id: 2, classId: 1, weekday: 2, timeSlotId: 2, subjectId: 2, teacherId: null, comment: "Թելադրություն" },
-    ],
-    lastSelectedClassId: 1,
-  };
-}
-
 const app = document.querySelector<HTMLDivElement>("#app");
-const loaded = loadState(localStorage);
-let state = loaded.kind === "valid" || loaded.kind === "migration" ? loaded.state : createInitialState();
-let migrationPending = loaded.kind === "migration" ? loaded : null;
+let state = initial;
+let highWaterId = Math.max(0, ...[...state.classes, ...state.timeSlots, ...state.subjects, ...state.teachers, ...state.lessons].map(row => row.id));
+function nextId(items: ReadonlyArray<{ id: number }>): number {
+  highWaterId = Math.max(highWaterId, ...items.map(row => row.id)) + 1;
+  return highWaterId;
+}
+let disposed = false;
+const syncBar = document.createElement("section"); syncBar.className = "cloud-sync-bar";
+syncBar.innerHTML = `<span role="status"></span><button class="secondary-button retry-save" type="button" hidden>Կրկին փորձել</button><button class="secondary-button reload-cloud" type="button">Բեռնել սերվերից</button><button class="secondary-button download-draft" type="button">Ներբեռնել սևագիրը</button>`;
+app?.before(syncBar);
+const queue = new SaveQueue(value => workspace.save(value), updateSyncStatus);
+function updateSyncStatus(): void {
+  if (disposed) return;
+  dirty = queue.dirty;
+  const label = queue.error || (dirty ? "Պահպանում ենք ամպում…" : "Պահպանված է ամպում");
+  syncBar.querySelector("span")!.textContent = label;
+  syncBar.querySelector<HTMLButtonElement>(".retry-save")!.hidden = !queue.error;
+  syncBar.querySelector<HTMLButtonElement>(".reload-cloud")!.disabled = queue.busy;
+  app?.querySelectorAll(".save-status").forEach(el => { el.textContent = queue.error ? "Չպահպանված փոփոխություններ" : label; el.classList.toggle("status-warning", dirty); });
+}
+syncBar.querySelector(".retry-save")?.addEventListener("click", () => queue.retry());
+syncBar.querySelector(".download-draft")?.addEventListener("click", () => downloadText(JSON.stringify(state, null, 2), "teacher-cloud-draft.json"));
+syncBar.querySelector(".reload-cloud")?.addEventListener("click", async () => {
+  if (queue.busy || (queue.dirty && !confirm("Կան չպահպանված փոփոխություններ։ Նախ ներբեռնեք սևագիրը։ Բեռնե՞լ սերվերից և հրաժարվել այդ փոփոխություններից։"))) return;
+  const button = syncBar.querySelector<HTMLButtonElement>(".reload-cloud")!; button.disabled = true; if (app) app.inert = true;
+  try {
+    const latest = await workspace.reload();
+    if (disposed) return;
+    queue.pending = null; queue.error = ""; state = latest; dirty = false;
+    renderApp(); updateSyncStatus();
+  } catch { if (!disposed) syncBar.querySelector("span")!.textContent = "Բեռնումը չհաջողվեց։ Սևագիրը չի փոխվել։"; }
+  finally { button.disabled = false; if (app && !disposed) app.inert = false; }
+});
 let page: Page = "workspace";
 let dirty = false;
-let saveError = "";
-let externalChange = false;
+
 let pendingCell: { classId: number; weekdayId: number; timeSlotId: number } | null = null;
 
 function selectedClass(): SchoolClass | undefined {
@@ -55,10 +64,8 @@ function normalizeSelection(): void {
   if (!selectedClass()) state.lastSelectedClassId = state.classes[0]?.id ?? null;
 }
 
-function persist(): boolean {
-  dirty = true;
-  try { saveState(state, localStorage); dirty = false; saveError = ""; return true; }
-  catch (error) { saveError = error instanceof Error ? error.message : "Տեղային պահպանումը ձախողվեց։"; return false; }
+function persist(): void {
+  queue.submit(state); // Only the acknowledgement updates the saved indicator.
 }
 
 function commit(render = true): void {
@@ -69,43 +76,9 @@ function commit(render = true): void {
 function renderApp(): void {
   if (!app) return;
   normalizeSelection();
-  if (migrationPending) { renderMigration(); return; }
-  if (loaded.kind === "invalid" && localStorage.getItem(STORAGE_KEY) === loaded.raw) { renderRecovery(loaded.message, loaded.raw); return; }
   if (page === "settings") renderSettings();
   else if (page === "preview") renderPreview();
   else renderWorkspace();
-}
-
-function renderRecovery(message: string, raw: string): void {
-  if (!app) return;
-  app.innerHTML = `<main class="page recovery-page"><section class="panel"><h1>Տեղային տվյալները չեն բացվել</h1><p class="recovery-error"></p><p>Տվյալները չեն փոխարինվել։ Կարող եք ներբեռնել հին պարունակությունը կամ հստակ գործողությամբ սկսել սկզբից։</p><div class="header-actions"><button id="download-storage" class="secondary-button" type="button">Ներբեռնել հին տվյալները</button><button id="reset-storage" class="danger-button" type="button">Մաքրել և սկսել սկզբից</button></div></section></main>`;
-  const error = document.querySelector(".recovery-error"); if (error) error.textContent = message;
-  document.querySelector("#download-storage")?.addEventListener("click", () => downloadText(raw, "teacher-storage-backup.json"));
-  document.querySelector("#reset-storage")?.addEventListener("click", () => {
-    if (!confirm("Մաքրե՞լ վնասված տեղային պահոցը և սկսել սկզբնական տվյալներից։ Հին տվյալները կկորչեն, եթե նախ չներբեռնեք։")) return;
-    localStorage.removeItem(STORAGE_KEY); state = createInitialState(); persist(); renderWorkspace();
-  });
-}
-
-function renderMigration(): void {
-  if (!app || !migrationPending) return;
-  app.innerHTML = `<main class="page migration-page"><section class="panel"><h1>Թարմացնել տեղային տվյալները</h1><p>Հին դասերը կկապվեն ընդհանուր առարկաների հետ։ Մինչ փոփոխությունը հին պահոցը կպահպանվի առանձին backup-ում։</p><div id="migration-conflicts"></div><p id="migration-error" class="form-error" role="alert"></p><div class="header-actions"><button id="download-migration" class="secondary-button" type="button">Ներբեռնել հին տվյալները</button><button id="confirm-migration" class="primary-button" type="button">Հաստատել անցումը</button></div></section></main>`;
-  const container = document.querySelector("#migration-conflicts");
-  if (migrationPending.conflicts.length && container) {
-    const heading = document.createElement("h2"); heading.textContent = "Ընտրեք ընդհանուր գույնը"; container.append(heading);
-    for (const conflict of migrationPending.conflicts) {
-      const row = document.createElement("label"); row.className = "migration-conflict"; const name = document.createElement("span"); name.textContent = `${conflict.name} — գտնվել են ${conflict.colors.join(", ")}`; const select = document.createElement("select"); select.dataset.subjectKey = conflict.key;
-      for (const color of conflict.colors) { const option = document.createElement("option"); option.value = color; option.textContent = color; option.selected = color === conflict.suggestedColor; select.append(option); }
-      row.append(name, select); container.append(row);
-    }
-  } else if (container) container.textContent = "Գունային հակասություններ չեն գտնվել։";
-  document.querySelector("#download-migration")?.addEventListener("click", () => migrationPending && downloadText(migrationPending.raw, "teacher-v1-backup.json"));
-  document.querySelector("#confirm-migration")?.addEventListener("click", () => {
-    if (!migrationPending) return;
-    document.querySelectorAll<HTMLSelectElement>("[data-subject-key]").forEach((select) => { const subject = state.subjects.find((item) => item.name.trim().toLocaleLowerCase("hy") === select.dataset.subjectKey); if (subject) subject.color = select.value; });
-    try { completeMigration(state, migrationPending.raw, localStorage); migrationPending = null; dirty = false; renderApp(); }
-    catch (error) { const element = document.querySelector("#migration-error"); if (element) element.textContent = error instanceof Error ? error.message : "Migration-ը չհաջողվեց։"; }
-  });
 }
 
 function downloadText(text: string, filename: string): void {
@@ -114,8 +87,8 @@ function downloadText(text: string, filename: string): void {
 }
 
 function statusMarkup(): string {
-  const saveLabel = dirty || saveError ? "Չպահպանված փոփոխություններ" : "Պահպանված է այս սարքում";
-  return `<div class="workspace-status"><span class="save-status ${dirty || saveError ? "status-warning" : ""}">${saveLabel}</span><span class="publish-status">Դեռ չի հրապարակվել</span></div>`;
+  const saveLabel = queue.error ? "Չպահպանված փոփոխություններ" : dirty ? "Պահպանում ենք ամպում…" : "Պահպանված է ամպում";
+  return `<div class="workspace-status"><span class="save-status ${dirty ? "status-warning" : ""}">${saveLabel}</span><span class="publish-status">Դեռ չի հրապարակվել</span></div>`;
 }
 
 function renderToolbar(title: string, preview = false): string {
@@ -130,15 +103,9 @@ function wireToolbar(): void {
 }
 
 function renderNotices(container: Element): void {
-  if (saveError) {
-    const notice = document.createElement("div"); notice.className = "notice error-notice"; notice.innerHTML = `<span></span><button class="secondary-button" type="button">Կրկին փորձել</button>`;
-    const text = notice.querySelector("span"); if (text) text.textContent = `Չհաջողվեց պահել․ ${saveError}`;
-    notice.querySelector("button")?.addEventListener("click", () => { persist(); renderApp(); }); container.append(notice);
-  }
-  if (externalChange) {
-    const notice = document.createElement("div"); notice.className = "notice external-notice"; notice.innerHTML = `<span>Մեկ այլ ներդիրում տվյալները փոխվել են։</span><button class="secondary-button" type="button">Բեռնել թարմ տվյալները</button>`;
-    notice.querySelector("button")?.addEventListener("click", reloadExternalState); container.append(notice);
-  }
+  const note = document.createElement("p");
+  note.textContent = "Ամպային սևագիր · Փոփոխությունները Student-ին կհասնեն միայն հրապարակումից հետո։";
+  container.append(note);
 }
 
 function renderWorkspace(): void {
@@ -237,7 +204,7 @@ function openLessonDialog(classId: number, weekdayId: number, timeSlotId: number
       }
       return;
     }
- if (lesson) { lesson.subjectId = subjectId; lesson.teacherId = teacherId; lesson.comment = comment?.value.trim() ?? ""; } else state.lessons.push({ id: nextId(state.lessons), classId, weekday: weekdayId, timeSlotId, subjectId, teacherId, comment: comment?.value.trim() ?? "" }); persist(); dialog.close("changed"); });
+ if (lesson) { lesson.subjectId = subjectId; lesson.teacherId = teacherId; lesson.comment = comment?.value.trim() ?? ""; } else state.lessons.push(candidate); persist(); dialog.close("changed"); });
   dialog.querySelector(".delete-button")?.addEventListener("click", () => { if (lesson) state.lessons.splice(state.lessons.indexOf(lesson), 1); persist(); dialog.close("changed"); });
   dialog.querySelectorAll(".cancel-dialog").forEach((button) => button.addEventListener("click", () => dialog.close("cancel")));
   dialog.addEventListener("close", () => { const changed = dialog.returnValue === "changed"; const goToSettings = dialog.returnValue === "settings"; dialog.remove(); if (dialog.returnValue === "conflict" && conflictTarget !== null) { state.lastSelectedClassId = conflictTarget; page = "workspace"; persist(); renderApp(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${weekdayId}"][data-time-slot="${timeSlotId}"]`)?.focus()); return; } if (changed) renderWorkspace(); if (goToSettings) { page = "settings"; renderApp(); requestAnimationFrame(() => document.querySelector("#add-subject")?.scrollIntoView({ block: "center" })); return; } requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${weekdayId}"][data-time-slot="${timeSlotId}"]`)?.focus() ?? returnFocus.focus()); });
@@ -259,6 +226,11 @@ function renderSettings(): void {
   document.querySelector("#save-school")?.addEventListener("click", () => { const name = schoolInput?.value.trim() ?? ""; const timezone = timezoneInput?.value.trim() ?? ""; const error = document.querySelector("#school-error"); if (!name) { if (error) error.textContent = "Դպրոցի անունը պարտադիր է։"; return; } if (!isValidTimezone(timezone)) { if (error) error.textContent = "Մուտքագրեք վավեր IANA ժամային գոտի, օրինակ՝ Asia/Yerevan։"; return; } state.school = { name, timezone }; commit(); });
   document.querySelector("#add-subject")?.addEventListener("click", addSubject); document.querySelector("#add-teacher")?.addEventListener("click", addTeacher);
   document.querySelector("#add-slot")?.addEventListener("click", addSlotEditor); renderSubjects(); renderTeachers(); renderTimeSlots();
+  if (role !== "admin") {
+    app.querySelectorAll<HTMLInputElement | HTMLButtonElement>(".school-settings input, .school-settings button, .slot-settings input, .slot-settings button").forEach(el => { el.disabled = true; });
+    const note = document.createElement("p"); note.textContent = "Դպրոցի տվյալներն ու դասաժամերը փոփոխում է ադմինիստրատորը։";
+    app.querySelector(".school-settings")?.append(note);
+  }
 }
 
 function normalizedDirectoryName(value: string): string { return value.trim().toLocaleLowerCase("hy"); }
@@ -297,28 +269,22 @@ function renderTimeSlots(): void {
 function appendSlotRow(list: HTMLTableSectionElement, slot: TimeSlot, number: number): void {
   const row = document.createElement("tr"); row.innerHTML = `<td>${number}</td><td><input type="time" name="start" required></td><td><input type="time" name="end" required></td><td><div class="slot-actions"><button class="secondary-button update-slot" type="button">Պահել</button><button class="danger-button remove-slot" type="button">Ջնջել</button></div><p class="row-error" role="alert"></p></td>`;
   const start = row.querySelector<HTMLInputElement>('[name="start"]'); const end = row.querySelector<HTMLInputElement>('[name="end"]'); if (start) start.value = slot.start; if (end) end.value = slot.end;
-  row.querySelector(".update-slot")?.addEventListener("click", () => { const candidate = { start: start?.value ?? "", end: end?.value ?? "" }; const validationError = validateTimeSlot(candidate, state.timeSlots, SCHOOL_ID, slot.id); const error = row.querySelector(".row-error"); if (error) error.textContent = validationError ?? ""; if (validationError) return; slot.start = candidate.start; slot.end = candidate.end; if (!persist()) { renderSettings(); return; } renderTimeSlots(); showSettingsMessage("Դասաժամը պահպանվեց։"); });
-  row.querySelector(".remove-slot")?.addEventListener("click", () => { if (isTimeSlotUsed(slot.id, state.lessons)) { const error = row.querySelector(".row-error"); if (error) error.textContent = "Չի կարելի ջնջել․ այս դասաժամն օգտագործվում է դասացուցակում։"; return; } state.timeSlots.splice(state.timeSlots.indexOf(slot), 1); if (!persist()) { renderSettings(); return; } renderTimeSlots(); showSettingsMessage("Դասաժամը ջնջվեց։"); }); list.append(row);
+  row.querySelector(".update-slot")?.addEventListener("click", () => { const candidate = { start: start?.value ?? "", end: end?.value ?? "" }; const validationError = validateTimeSlot(candidate, state.timeSlots, SCHOOL_ID, slot.id); const error = row.querySelector(".row-error"); if (error) error.textContent = validationError ?? ""; if (validationError) return; slot.start = candidate.start; slot.end = candidate.end; persist(); renderSettings(); });
+  row.querySelector(".remove-slot")?.addEventListener("click", () => { if (isTimeSlotUsed(slot.id, state.lessons)) { const error = row.querySelector(".row-error"); if (error) error.textContent = "Չի կարելի ջնջել․ այս դասաժամն օգտագործվում է դասացուցակում։"; return; } state.timeSlots.splice(state.timeSlots.indexOf(slot), 1); persist(); renderSettings(); }); list.append(row);
 }
 function addSlotEditor(): void {
   const list = document.querySelector<HTMLTableSectionElement>("#slot-list"); if (!list || list.querySelector(".new-slot-row")) return; if (list.querySelector(".empty-settings")) list.replaceChildren();
   const row = document.createElement("tr"); row.className = "new-slot-row"; row.innerHTML = `<td>Նոր</td><td><input type="time" name="start" required></td><td><input type="time" name="end" required></td><td><div class="slot-actions"><button class="primary-button save-new-slot" type="button">Ավելացնել</button><button class="secondary-button cancel-new-slot" type="button">Չեղարկել</button></div><p class="row-error" role="alert"></p></td>`; list.append(row);
   const start = row.querySelector<HTMLInputElement>('[name="start"]'); const end = row.querySelector<HTMLInputElement>('[name="end"]'); start?.focus();
-  row.querySelector(".save-new-slot")?.addEventListener("click", () => { const candidate = { start: start?.value ?? "", end: end?.value ?? "" }; const validationError = validateTimeSlot(candidate, state.timeSlots, SCHOOL_ID); const error = row.querySelector(".row-error"); if (error) error.textContent = validationError ?? ""; if (validationError) return; state.timeSlots.push({ id: nextId(state.timeSlots), schoolId: SCHOOL_ID, ...candidate }); if (!persist()) { renderSettings(); return; } renderTimeSlots(); showSettingsMessage("Նոր դասաժամն ավելացվեց։"); });
+  row.querySelector(".save-new-slot")?.addEventListener("click", () => { const candidate = { start: start?.value ?? "", end: end?.value ?? "" }; const validationError = validateTimeSlot(candidate, state.timeSlots, SCHOOL_ID); const error = row.querySelector(".row-error"); if (error) error.textContent = validationError ?? ""; if (validationError) return; state.timeSlots.push({ id: nextId(state.timeSlots), schoolId: SCHOOL_ID, ...candidate }); persist(); renderSettings(); });
   row.querySelector(".cancel-new-slot")?.addEventListener("click", renderTimeSlots);
 }
-function showSettingsMessage(message: string): void { const element = document.querySelector("#settings-message"); if (element) element.textContent = message; }
 
-function reloadExternalState(): void {
-  if (dirty && !confirm("Կան չպահպանված փոփոխություններ։ Բեռնե՞լ մյուս ներդիրի տվյալները և կորցնել դրանք։")) return;
-  const result = loadState(localStorage); if (result.kind === "valid" || result.kind === "migration") { state = result.state; migrationPending = result.kind === "migration" ? result : null; dirty = false; saveError = ""; externalChange = false; normalizeSelection(); renderApp(); }
-  else { alert(result.kind === "invalid" ? result.message : "Մյուս ներդիրի պահոցն այլևս հասանելի չէ։"); }
-}
-window.addEventListener("storage", (event) => { if (event.key === `account:${userId}:${STORAGE_KEY}`) { externalChange = true; renderApp(); } }, { signal: controller.signal });
 window.addEventListener("beforeunload", (event) => { if (!dirty) return; event.preventDefault(); event.returnValue = ""; }, { signal: controller.signal });
-
-if (loaded.kind === "missing") persist();
+window.addEventListener("teacher-before-leave", (event) => {
+  if (queue.dirty && !confirm("Կան չպահպանված փոփոխություններ։ Նախ ներբեռնեք սևագիրը։ Միևնույն է դուրս գա՞լ։")) event.preventDefault();
+}, { signal: controller.signal });
 renderApp();
-
-return () => { controller.abort(); document.querySelectorAll("dialog").forEach((dialog) => dialog.remove()); app?.replaceChildren(); };
+updateSyncStatus();
+return () => { disposed = true; queue.dispose(); controller.abort(); syncBar.remove(); if (app) app.inert = false; document.querySelectorAll("dialog").forEach(dialog => dialog.remove()); app?.replaceChildren(); };
 }

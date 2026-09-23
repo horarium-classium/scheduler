@@ -7,8 +7,8 @@
 ## Նախագծի կառուցվածք
 
 - `apps/student/` — Windows, macOS և Linux desktop հավելված՝ TypeScript, Vanilla HTML/CSS, Vite, Tauri 2 և Rust։ Դասացուցակի բեռնումը frontend-ում է, հիշեցումների scheduler-ը՝ Rust-ում։
-- `apps/teacher/` — TypeScript և Vanilla HTML/CSS վեբ խմբագրիչ։ `src/model.ts`-ը պահում է մոդելն ու բախումների ստուգումները, `src/storage.ts`-ը՝ validation-ը, migration-ը և browser-ի `localStorage` պահոցը, `src/main.ts`-ը՝ UI-ն։
-- `supabase/` — PostgreSQL migrations, RLS, local seed և pgTAP թեստեր։ Teacher-ի ամպային շերտի հիմքն է. ընթացիկ Teacher frontend-ը դեռ օգտագործում է տեղային պահոցը։
+- `apps/teacher/` — TypeScript և Vanilla HTML/CSS վեբ խմբագրիչ։ `src/model.ts`-ը պահում է մոդելն ու բախումների ստուգումները, `src/state.ts`-ը՝ վիճակի validation-ը, `src/main.ts`-ը՝ UI-ն։ `src/cloud-workspace.ts`-ը կատարում է ամպային տվյալների փոխակերպումն ու հերթագրված պահպանումը, `src/auth.ts`-ը՝ մուտքն ու դպրոցի բեռնումը։
+- `supabase/` — PostgreSQL migrations, RLS, local seed և pgTAP թեստեր։ Teacher-ի ամպային շերտի հիմքն է. ընթացիկ Teacher frontend-ը օգտագործում է workspace RPC-ներ՝ պահպանելով RLS-ը և հնացած տարբերակների մերժումը։
 - `.github/workflows/release.yml` — `v*.*.*` tag-ից Windows NSIS installer-ի կառուցում և GitHub Release-ի հրապարակում։ Սովորական push/PR-ի ավտոմատ ստուգումների վրա հույս մի դիր։
 
 Root-ը npm workspace չէ։ Root-ը, Student-ը և Teacher-ը ունեն առանձին `package.json` ու `package-lock.json`։ Կախվածությունները տեղադրիր համապատասխան պանակում՝ `npm ci`-ով։ Փոխիր միայն տվյալ բաղադրիչի անհրաժեշտ dependencies-ն ու lockfile-ը։

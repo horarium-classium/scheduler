@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { findLessonConflict, findScheduleConflicts, type Lesson } from "../src/model.ts";
-import { validateState, SCHEMA_VERSION } from "../src/storage.ts";
+import { validateState, SCHEMA_VERSION } from "../src/state.ts";
 const base: Lesson = { id: 1, classId: 1, weekday: 1, timeSlotId: 1, subjectId: 1, teacherId: 1, comment: "" };
 
 test("teacher collision compares identities and excludes the edited lesson", () => {
