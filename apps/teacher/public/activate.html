@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="hy"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Ակտիվացնել հաշիվը</title>
 <style>body{font:16px system-ui;background:#f3f4f6;color:#1f2937;margin:0}main{max-width:440px;margin:8vh auto;padding:28px;background:white;border-radius:12px}label{display:grid;gap:8px;margin:20px 0}input,button{font:inherit;padding:10px}button{cursor:pointer}#status{white-space:pre-wrap}a{color:#2563eb}</style>
-<main><h1>Ակտիվացնել հաշիվը</h1><p id="status" role="status">Ստուգում ենք հրավերը…</p><form hidden><label>Նոր գաղտնաբառ<input name="password" type="password" minlength="12" autocomplete="new-password" required></label><label>Կրկնել գաղտնաբառը<input name="confirmation" type="password" minlength="12" autocomplete="new-password" required></label><button>Պահպանել գաղտնաբառը</button></form><p id="done" hidden>Հաշիվն ակտիվացված է։ Teacher-ի ամպային մուտքը կմիացվի հաջորդ փուլում։ Կարող եք փակել այս էջը։</p></main>
+<main><h1>Ակտիվացնել հաշիվը</h1><p id="status" role="status">Ստուգում ենք հրավերը…</p><form hidden><label>Նոր գաղտնաբառ<input name="password" type="password" minlength="12" autocomplete="new-password" required></label><label>Կրկնել գաղտնաբառը<input name="confirmation" type="password" minlength="12" autocomplete="new-password" required></label><button>Պահպանել գաղտնաբառը</button></form><p id="done" hidden>Հաշիվն ակտիվացված է։ <a href="./">Մուտք գործել Teacher</a>։</p></main>
 <script type="module">
 const base="https://soqjiqvapluubkibzrut.supabase.co", apiKey="sb_publishable_dsVeNj0g2m2ww_gWMosO4g_5_jk6Tzy";
 const params=new URLSearchParams(location.hash.slice(1));

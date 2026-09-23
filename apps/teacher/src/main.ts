@@ -2,6 +2,11 @@ import "./style.css";
 import { findLessonConflict, isTimeSlotUsed, nextId, removeClassDraft, sortTimeSlots, validateTimeSlot, type SchoolClass, type Subject, type Teacher, type TimeSlot } from "./model";
 import { SCHEMA_VERSION, STORAGE_KEY, completeMigration, isValidTimezone, loadState, saveState, type TeacherState } from "./storage";
 
+import { accountStorage } from "./account-storage";
+
+export function mountEditor(userId: string): () => void {
+const localStorage = accountStorage(userId, window.localStorage);
+const controller = new AbortController();
 interface Weekday { id: number; name: string; shortName: string; }
 type Page = "workspace" | "settings" | "preview";
 const SCHOOL_ID = 1;
@@ -33,7 +38,7 @@ function createInitialState(): TeacherState {
 }
 
 const app = document.querySelector<HTMLDivElement>("#app");
-const loaded = loadState();
+const loaded = loadState(localStorage);
 let state = loaded.kind === "valid" || loaded.kind === "migration" ? loaded.state : createInitialState();
 let migrationPending = loaded.kind === "migration" ? loaded : null;
 let page: Page = "workspace";
@@ -52,7 +57,7 @@ function normalizeSelection(): void {
 
 function persist(): boolean {
   dirty = true;
-  try { saveState(state); dirty = false; saveError = ""; return true; }
+  try { saveState(state, localStorage); dirty = false; saveError = ""; return true; }
   catch (error) { saveError = error instanceof Error ? error.message : "Տեղային պահպանումը ձախողվեց։"; return false; }
 }
 
@@ -98,7 +103,7 @@ function renderMigration(): void {
   document.querySelector("#confirm-migration")?.addEventListener("click", () => {
     if (!migrationPending) return;
     document.querySelectorAll<HTMLSelectElement>("[data-subject-key]").forEach((select) => { const subject = state.subjects.find((item) => item.name.trim().toLocaleLowerCase("hy") === select.dataset.subjectKey); if (subject) subject.color = select.value; });
-    try { completeMigration(state, migrationPending.raw); migrationPending = null; dirty = false; renderApp(); }
+    try { completeMigration(state, migrationPending.raw, localStorage); migrationPending = null; dirty = false; renderApp(); }
     catch (error) { const element = document.querySelector("#migration-error"); if (element) element.textContent = error instanceof Error ? error.message : "Migration-ը չհաջողվեց։"; }
   });
 }
@@ -306,11 +311,14 @@ function showSettingsMessage(message: string): void { const element = document.q
 
 function reloadExternalState(): void {
   if (dirty && !confirm("Կան չպահպանված փոփոխություններ։ Բեռնե՞լ մյուս ներդիրի տվյալները և կորցնել դրանք։")) return;
-  const result = loadState(); if (result.kind === "valid" || result.kind === "migration") { state = result.state; migrationPending = result.kind === "migration" ? result : null; dirty = false; saveError = ""; externalChange = false; normalizeSelection(); renderApp(); }
+  const result = loadState(localStorage); if (result.kind === "valid" || result.kind === "migration") { state = result.state; migrationPending = result.kind === "migration" ? result : null; dirty = false; saveError = ""; externalChange = false; normalizeSelection(); renderApp(); }
   else { alert(result.kind === "invalid" ? result.message : "Մյուս ներդիրի պահոցն այլևս հասանելի չէ։"); }
 }
-window.addEventListener("storage", (event) => { if (event.key === STORAGE_KEY) { externalChange = true; renderApp(); } });
-window.addEventListener("beforeunload", (event) => { if (!dirty) return; event.preventDefault(); event.returnValue = ""; });
+window.addEventListener("storage", (event) => { if (event.key === `account:${userId}:${STORAGE_KEY}`) { externalChange = true; renderApp(); } }, { signal: controller.signal });
+window.addEventListener("beforeunload", (event) => { if (!dirty) return; event.preventDefault(); event.returnValue = ""; }, { signal: controller.signal });
 
 if (loaded.kind === "missing") persist();
 renderApp();
+
+return () => { controller.abort(); document.querySelectorAll("dialog").forEach((dialog) => dialog.remove()); app?.replaceChildren(); };
+}

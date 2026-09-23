@@ -11,7 +11,7 @@ API URL: https://soqjiqvapluubkibzrut.supabase.co
 
 - Three repository migrations applied, without seed data or test users.
 - Local/remote migration history matches; remote database lint passed.
-- Auth public signup disabled; development site URL is http://127.0.0.1:5173, redirects allow localhost:5173 and 127.0.0.1:5173.
+- Auth public signup disabled; site URL is https://armenbadal.github.io/horarium-classium/. Redirects retain the local development URLs and allow https://armenbadal.github.io/horarium-classium/activate.html. Updated 2026-09-23; other hosted Auth settings were left unchanged.
 - Teacher still uses localStorage. No cloud login UI, data adapter, import, publication RPC or Student integration yet.
 
 ## Credentials
@@ -41,3 +41,7 @@ npx supabase config push --project-ref soqjiqvapluubkibzrut --workdir supabase/e
 Inspect declared updates before pushing. Do not push the root local config: it enables local test signup.
 
 Next: create the real development administrator account and school membership, then implement Teacher authentication and cloud persistence. Import local data as a separate backed-up operation; do not use local seed accounts remotely.
+
+## Account recreation — 2026-09-23
+
+The requested existing Auth account was deleted and a fresh invitation sent to the same email. Activation is pending. Account deletion cascades to its profile and school memberships; those are not automatically restored for the new user ID.
