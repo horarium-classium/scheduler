@@ -45,3 +45,7 @@ The confirmed user account is linked as admin of the existing «Տնային դ�
 ## Account recreation — 2026-09-23
 
 The requested existing Auth account was deleted and a fresh invitation sent to the same email. Activation and login/logout were subsequently verified. Account deletion cascaded to its old memberships; the new account has now been explicitly linked to «Տնային դպրոց» as admin.
+
+## Publication migration (local implementation)
+
+`202609240001_publication.sql` adds class publishing, immutable revisions and anonymous latest-publication reads. It has not been applied to this hosted project by this task. Apply it through the deployment sequence above before deploying the updated Teacher frontend. See `PUBLICATION.md` for the contract and validation limits. Student still uses its existing source.

@@ -3,11 +3,28 @@ import { SCHEMA_VERSION, validateState, type TeacherState } from "./state.ts";
 export const tables = ["classes", "time_slots", "subjects", "teachers", "lessons"] as const;
 type Table = typeof tables[number];
 type Row = Record<string, unknown> & { id: string };
-export interface WorkspaceSnapshot { version: string; data: { school: Row } & Record<Table, Row[]>; }
+export interface PublicationStatus { class_id: string; public_id: string; revision: number | null; published_at: string | null; is_current: boolean; }
+export interface WorkspaceSnapshot { version: string; data: { school: Row } & Record<Table, Row[]>; publications?: PublicationStatus[]; }
+export type PublicationState = "unavailable" | "unpublished" | "published" | "changed";
+
+// Compare only this class and its referenced directory entries. Other classes,
+// unused slots/subjects and UI selection must not mark a publication as changed.
+export function classDraftSignature(state: TeacherState, classId: number): string {
+  return JSON.stringify({ school: state.school, name: state.classes.find(c => c.id === classId)?.name,
+    lessons: state.lessons.filter(l => l.classId === classId).map(l => {
+      const slot = state.timeSlots.find(s => s.id === l.timeSlotId);
+      const subject = state.subjects.find(s => s.id === l.subjectId);
+      const teacher = state.teachers.find(t => t.id === l.teacherId);
+      return { weekday: l.weekday, start: slot?.start, end: slot?.end, subjectId: l.subjectId,
+        lesson: subject?.name, color: subject?.color, teacherId: l.teacherId,
+        teacherName: teacher?.name ?? null, comment: l.comment };
+    }).sort((a,b) => a.weekday - b.weekday || (a.start ?? "").localeCompare(b.start ?? "")) });
+}
 export interface Change { table: Table | "schools"; op: "insert" | "update" | "delete"; row: Record<string, unknown>; }
 export interface WorkspaceTransport {
   read(): Promise<unknown>;
   save(version: string, changes: Change[]): Promise<unknown>;
+  publish?(classId: string, version: string): Promise<unknown>;
 }
 const fields: Record<Table, string[]> = {
   classes: ["name", "sort_order"], time_slots: ["start_time", "end_time", "sort_order"],
@@ -27,19 +44,36 @@ export function parseSnapshot(value: unknown, schoolId: string): WorkspaceSnapsh
       ids.add(row.id);
     }
   }
+  if (value.publications !== undefined) {
+    const classes = value.data.classes as Row[];
+    if (!Array.isArray(value.publications) || value.publications.length !== classes.length) throw new Error("Հրապարակման կարգավիճակներն անվավեր են։");
+    const seen = new Set<string>();
+    for (const item of value.publications) {
+      if (!record(item) || typeof item.class_id !== "string" || seen.has(item.class_id) ||
+        !classes.some((row: Row) => row.id === item.class_id && row.public_id === item.public_id) ||
+        typeof item.public_id !== "string" || !uuid.test(item.public_id) || typeof item.is_current !== "boolean" ||
+        (item.revision === null ? item.published_at !== null || item.is_current :
+          !Number.isSafeInteger(item.revision) || Number(item.revision) < 1 || typeof item.published_at !== "string" || !Number.isFinite(Date.parse(item.published_at)))) {
+        throw new Error("Հրապարակման կարգավիճակներն անվավեր են։");
+      }
+      seen.add(item.class_id);
+    }
+  }
   return value as unknown as WorkspaceSnapshot;
 }
 export function cloudError(error: unknown): string {
   const code = record(error) ? error.code : undefined;
   if (code === "40001") return "Դասացուցակը փոխվել է այլ ներդիրում կամ սարքում։ Ներբեռնեք ձեր սևագիրը և բեռնեք սերվերի նոր տարբերակը։";
+  if (code === "22023") return "Դասարանը հասանելի չէ հրապարակման համար։ Բեռնեք սերվերի նոր տարբերակը։";
   if (code === "42501") return "Այս փոփոխության համար իրավունք չունեք, կամ դպրոցի անդամակցությունը փոխվել է։";
-  if (["23503", "23505", "23514", "23P01"].includes(String(code))) return "Սերվերը մերժեց փոփոխությունը․ ստուգեք կրկնվող անունները, ժամերը և դասերի կապերը։";
+  if (["23001", "23503", "23505", "23514", "23P01"].includes(String(code))) return "Սերվերը մերժեց փոփոխությունը․ ստուգեք կրկնվող անունները, ժամերը և դասերի կապերը։";
   return error instanceof Error ? error.message : "Ամպային պահպանումը չհաջողվեց։ Ստուգեք կապը և կրկին փորձեք։";
 }
 
 export class CloudWorkspace {
   readonly schoolId: string;
   private snapshot: WorkspaceSnapshot;
+  private acknowledged = new Map<number, string>();
   private ids: Record<Table, Map<number, string>> = Object.fromEntries(tables.map(t => [t, new Map()])) as Record<Table, Map<number, string>>;
   private transport: WorkspaceTransport;
   constructor(schoolId: string, snapshot: unknown, transport: WorkspaceTransport) {
@@ -68,7 +102,37 @@ export class CloudWorkspace {
     };
     state.lastSelectedClassId = state.classes[0]?.id ?? null;
     const error = validateState(state); if (error) throw new Error(error);
+    this.remember(state);
     return state;
+  }
+  private remember(state: TeacherState): void {
+    this.acknowledged = new Map(state.classes.map(c => [c.id, classDraftSignature(state, c.id)]));
+  }
+  get publicationAvailable(): boolean { return this.snapshot.publications !== undefined && !!this.transport.publish; }
+  publication(classId: number): PublicationStatus | undefined {
+    return this.snapshot.publications?.find(p => p.class_id === this.ids.classes.get(classId));
+  }
+  publicationState(state: TeacherState, classId: number): PublicationState {
+    if (!this.publicationAvailable) return "unavailable";
+    const published = this.publication(classId);
+    if (!published?.revision) return "unpublished";
+    return published.is_current && this.acknowledged.get(classId) === classDraftSignature(state, classId) ? "published" : "changed";
+  }
+  async publish(classId: number, state: TeacherState): Promise<void> {
+    if (!this.publicationAvailable) throw new Error("Հրապարակման backend-ը դեռ միացված չէ։");
+    if (this.changes(state).length) throw new Error("Նախ սպասեք սևագրի պահպանմանը։");
+    const remoteId = this.ids.classes.get(classId);
+    if (!remoteId || !state.classes.some(c => c.id === classId)) throw new Error("Դասարանը չի գտնվել։");
+    const result = await this.transport.publish!(remoteId, this.snapshot.version);
+    if (!record(result) || !Number.isSafeInteger(result.revision) || Number(result.revision) < 1 ||
+      typeof result.publishedAt !== "string" || !Number.isFinite(Date.parse(result.publishedAt))) throw new Error("Հրապարակման պատասխանը սխալ է։ Բեռնեք սերվերի նոր տարբերակը։");
+    const next = parseSnapshot(result.workspace, this.schoolId);
+    const published = next.publications?.find(p => p.class_id === remoteId);
+    if (!published?.is_current || published.revision !== result.revision || published.published_at !== result.publishedAt || next.version !== this.snapshot.version) {
+      throw new Error("Հրապարակման հաստատումը բացակայում է։ Բեռնեք սերվերի նոր տարբերակը։");
+    }
+    this.snapshot = next;
+    this.remember(state);
   }
   private time(value: unknown): string {
     if (typeof value !== "string" || !/^\d{2}:\d{2}:00$/.test(value)) throw new Error("Սերվերի դասաժամի ձևաչափը սխալ է։");
@@ -110,6 +174,7 @@ export class CloudWorkspace {
     const changes = this.changes(state);
     if (!changes.length) return;
     this.snapshot = parseSnapshot(await this.transport.save(this.snapshot.version, changes), this.schoolId);
+    this.remember(state);
     // Retire removed IDs only after acknowledgement. Failed requests retain stable retry IDs.
     for (const table of tables) {
       const existing = new Set(this.snapshot.data[table].map(r => r.id));

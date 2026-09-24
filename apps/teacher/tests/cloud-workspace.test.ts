@@ -73,3 +73,65 @@ test("signout disposal stops queued writes and late UI notifications", async () 
   queue.submit(state); queue.submit(state); queue.dispose(); const before = notifications; release(); await tick();
   assert.equal(calls, 1); assert.equal(notifications, before);
 });
+
+function publicationFixture() {
+  const value = snapshot() as WorkspaceSnapshot & { publications: import("../src/cloud-workspace.ts").PublicationStatus[] };
+  value.publications = [{ class_id: id(2), public_id: id(90), revision: null, published_at: null, is_current: false }];
+  return value;
+}
+test("publication uses server UUID and acknowledged version, then validates confirmation", async () => {
+  const value = publicationFixture();
+  let calls = 0;
+  const cloud = new CloudWorkspace(school, value, { read: async () => value, save: async () => value,
+    publish: async (classId, version) => {
+      calls++; assert.equal(classId,id(2)); assert.equal(version,"v1");
+      const next = structuredClone(value); next.publications[0] = { ...next.publications[0]!, revision: 1, published_at: "2026-09-24T10:00:00Z", is_current: true };
+      return {revision:1,publishedAt:next.publications[0].published_at,workspace:next};
+    } });
+  const state=cloud.decode(); const classId=state.classes[0]!.id;
+  assert.equal(cloud.publicationState(state,classId),"unpublished");
+  state.classes[0]!.name="Edited";
+  await assert.rejects(cloud.publish(classId,state),/պահպանմանը/); assert.equal(calls,0);
+  state.classes[0]!.name="5Ա";
+  await cloud.publish(classId,state);
+  assert.equal(cloud.publicationState(state,classId),"published");
+  state.subjects[0]!.color="#ffffff";
+  assert.equal(cloud.publicationState(state,classId),"changed");
+  state.subjects[0]!.color="#abcdef";
+  assert.equal(cloud.publicationState(state,classId),"published");
+  state.timeSlots[0]!.start="08:30";
+  assert.equal(cloud.publicationState(state,classId),"changed");
+  state.timeSlots[0]!.start="09:00";
+  state.lessons[0]!.comment="private comment";
+  assert.equal(cloud.publicationState(state,classId),"changed");
+  state.lessons[0]!.comment="";
+  state.classes.push({id:99,name:"Other"});
+  state.subjects.push({id:99,schoolId:1,name:"Unused",color:"#ffffff"});
+  state.lastSelectedClassId=99;
+  assert.equal(cloud.publicationState(state,classId),"published");
+});
+test("publication failures and malformed responses never report a published draft", async () => {
+  const value=publicationFixture();
+  let response: unknown={revision:1,publishedAt:"2026-09-24T10:00:00Z",workspace:value};
+  const cloud=new CloudWorkspace(school,value,{read:async()=>value,save:async()=>value,publish:async()=>response});
+  const state=cloud.decode();const classId=state.classes[0]!.id;
+  await assert.rejects(cloud.publish(classId,state),/հաստատումը/);
+  assert.equal(cloud.publicationState(state,classId),"unpublished");
+  response={revision:1,publishedAt:"not a date",workspace:value};
+  await assert.rejects(cloud.publish(classId,state),/պատասխանը/);
+  const failed=new CloudWorkspace(school,value,{read:async()=>value,save:async()=>value,publish:async()=>{throw {code:"40001"};}});
+  const initial=failed.decode();
+  await assert.rejects(failed.publish(initial.classes[0]!.id,initial));
+  assert.equal(failed.publicationState(initial,initial.classes[0]!.id),"unpublished");
+  const old=workspace(); const oldState=old.decode();
+  assert.equal(old.publicationState(oldState,oldState.classes[0]!.id),"unavailable");
+  await assert.rejects(old.publish(oldState.classes[0]!.id,oldState),/միացված չէ/);
+});
+test("publication metadata must identify real unique classes with consistent revisions", () => {
+  const value=publicationFixture();value.publications[0]!.class_id=id(999);
+  assert.throws(()=>parseSnapshot(value,school));
+  value.publications[0]!.class_id=id(2);value.publications[0]!.is_current=true;
+  assert.throws(()=>parseSnapshot(value,school));
+  value.publications[0]!.is_current=false;value.publications[0]!.revision=-1;
+  assert.throws(()=>parseSnapshot(value,school));
+});

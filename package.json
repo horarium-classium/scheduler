@@ -7,9 +7,11 @@
     "supabase:reset": "supabase db reset --local",
     "supabase:test": "supabase test db --db-url postgresql://supabase_admin:postgres@127.0.0.1:54322/postgres",
     "supabase:lint": "supabase db lint --local --fail-on error",
-    "supabase:verify": "npm run supabase:reset && npm run supabase:test && npm run supabase:lint"
+    "supabase:verify": "npm run supabase:reset && npm run supabase:test && npm run supabase:lint",
+    "publication:test:embedded": "node --experimental-strip-types --test supabase/tests/publication.embedded.test.mjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "supabase": "2.117.0"
   }
 }

@@ -106,6 +106,10 @@ async function loadSchools(userId: string, generation: number): Promise<void> {
         };
         const workspace = new CloudWorkspace(school.id, await read(), {
           read,
+          publish: async (classId, version) => {
+            const result = await client.rpc("publish_schedule", { p_school: school.id, p_class: classId, p_version: version });
+            if (result.error) throw result.error; return result.data;
+          },
           save: async (version, changes) => {
             const result = await client.rpc("teacher_workspace_save", { p_school: school.id, p_version: version, p_changes: changes });
             if (result.error) throw result.error; return result.data;
