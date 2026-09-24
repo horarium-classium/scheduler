@@ -48,4 +48,4 @@ The requested existing Auth account was deleted and a fresh invitation sent to t
 
 ## Publication migration (local implementation)
 
-`202609240001_publication.sql` adds class publishing, immutable revisions and anonymous latest-publication reads. It has not been applied to this hosted project by this task. Apply it through the deployment sequence above before deploying the updated Teacher frontend. See `PUBLICATION.md` for the contract and validation limits. Student still uses its existing source.
+`202609240001_publication.sql` was applied to this hosted project on 2026-09-24. The remote migration history matches the repository and linked database lint reports no schema errors. It adds class publishing, immutable revisions and anonymous latest-publication reads. See `PUBLICATION.md` for the contract and validation limits. Student still uses its existing source.
