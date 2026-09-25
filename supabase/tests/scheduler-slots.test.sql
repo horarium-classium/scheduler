@@ -1,0 +1,15 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = public, extensions;
+select plan(6);
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000002', true);
+select lives_ok($$insert into time_slots(id,school_id,start_time,end_time) values ('aaaaaaaa-2000-0000-0000-000000000077','aaaaaaaa-0000-0000-0000-000000000001','20:00','20:45')$$, 'scheduler inserts own slot');
+with changed as (update time_slots set start_time='20:05' where id='aaaaaaaa-2000-0000-0000-000000000077' returning 1) select is((select count(*)::integer from changed),1,'scheduler updates own slot');
+with changed as (delete from time_slots where id='aaaaaaaa-2000-0000-0000-000000000077' returning 1) select is((select count(*)::integer from changed),1,'scheduler deletes own slot');
+select throws_ok($$insert into time_slots(school_id,start_time,end_time) values ('bbbbbbbb-0000-0000-0000-000000000001','20:00','20:45')$$,'42501',null,'cannot insert another school slot');
+with changed as (update time_slots set start_time='20:05' where school_id='bbbbbbbb-0000-0000-0000-000000000001' returning 1) select is((select count(*)::integer from changed),0,'cannot update another school slots');
+with changed as (delete from time_slots where school_id='bbbbbbbb-0000-0000-0000-000000000001' returning 1) select is((select count(*)::integer from changed),0,'cannot delete another school slots');
+reset role;
+select * from finish();
+rollback;

@@ -33,7 +33,7 @@ select is((select count(*)::integer from school_members), 1, 'scheduler sees onl
 select lives_ok($$insert into classes(id,school_id,name,public_id) values ('aaaaaaaa-1000-0000-0000-000000000088','aaaaaaaa-0000-0000-0000-000000000001','7Ա','aaaaaaaa-1100-0000-0000-000000000088')$$, 'scheduler manages own classes');
 with changed as (update schools set name='Չպետք է փոխվի' where id='aaaaaaaa-0000-0000-0000-000000000001' returning 1)
 select is((select count(*)::integer from changed), 0, 'scheduler cannot update school');
-select throws_ok($$insert into time_slots(school_id,start_time,end_time) values ('aaaaaaaa-0000-0000-0000-000000000001','16:00','16:45')$$, '42501', null, 'scheduler cannot create time slots');
+select lives_ok($$insert into time_slots(school_id,start_time,end_time) values ('aaaaaaaa-0000-0000-0000-000000000001','16:00','16:45')$$, 'scheduler creates own time slots');
 select throws_ok($$update school_members set role='admin' where user_id='10000000-0000-0000-0000-000000000002'$$, '42501', null, 'scheduler cannot elevate membership role');
 select lives_ok($$insert into lessons(id,school_id,class_id,weekday,time_slot_id,subject_id) values ('aaaaaaaa-5000-0000-0000-000000000088','aaaaaaaa-0000-0000-0000-000000000001','aaaaaaaa-1000-0000-0000-000000000002',4,'aaaaaaaa-2000-0000-0000-000000000001','aaaaaaaa-3000-0000-0000-000000000001')$$, 'scheduler creates own lesson');
 select lives_ok($$update lessons set comment='նոր մեկնաբանություն' where id='aaaaaaaa-5000-0000-0000-000000000001'$$, 'scheduler updates own lesson');

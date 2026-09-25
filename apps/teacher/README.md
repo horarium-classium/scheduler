@@ -66,8 +66,8 @@ Vite-ը փոխանցում է նաև `activate.html` հրավերի էջին։
 պահպանելով կապերն ու առկա public ID-ները։ Յուրաքանչյուր պահպանում փոխանցում է միայն
 փոփոխված տողերը մեկ transaction-ով, գործող RLS կանոնների ներքո։
 
-- Admin-ը կարող է փոխել կարգավորումներն ու դասաժամերը։
-- Scheduler-ը կարող է խմբագրել դասարանները, առարկաները, ուսուցիչներն ու դասերը։
+- Admin-ը կարող է փոխել դպրոցի կարգավորումները։
+- Scheduler-ը կարող է կառավարել դասարաններն ու դասաժամերը, խմբագրել առարկաները, ուսուցիչներն ու դասերը։
 - Membership-ների փոփոխությունը frontend-ից հասանելի չէ։ Admin-ը և scheduler-ը կարող են հրապարակել ընտրված դասարանը։
 
 «Պահպանված է ամպում» նշումը հայտնվում է միայն սերվերի հաստատումից հետո։ Արագ
@@ -124,3 +124,5 @@ The activation page handles invite/recovery callbacks with isolated in-memory cr
 The hosted configuration now declares `activate.html` as Site URL. This local declaration has NOT been applied remotely. First publish and verify the Teacher Pages build, including activation assets under `/horarium-classium/`; then inspect the linked project's hosted config diff and apply only the intended URL changes. Preserve the default Invite email `{{ .ConfirmationURL }}` template. Do not push the root local Supabase config.
 
 Verify one new Dashboard invitation end to end, an old still-valid root redirect, expired/reused links, recovery, password rejection/network retry, and a browser already signed into a different account. Confirm that an unassigned user sees the membership message. Email rate limiting is separate; avoid repeated invitation sends.
+
+Scheduler-ի դասաժամերի կառավարումը պահանջում է `202609250001_scheduler_time_slots.sql` migration-ը։ Նախ կիրառել migration-ը, ապա հրապարակել Teacher-ը։

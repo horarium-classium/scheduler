@@ -276,8 +276,8 @@ function renderSettings(): void {
   document.querySelector("#add-subject")?.addEventListener("click", addSubject); document.querySelector("#add-teacher")?.addEventListener("click", addTeacher);
   document.querySelector("#add-slot")?.addEventListener("click", addSlotEditor); renderSubjects(); renderTeachers(); renderTimeSlots();
   if (role !== "admin") {
-    app.querySelectorAll<HTMLInputElement | HTMLButtonElement>(".school-settings input, .school-settings button, .slot-settings input, .slot-settings button").forEach(el => { el.disabled = true; });
-    const note = document.createElement("p"); note.textContent = "Դպրոցի տվյալներն ու դասաժամերը փոփոխում է ադմինիստրատորը։";
+    app.querySelectorAll<HTMLInputElement | HTMLButtonElement>(".school-settings input, .school-settings button").forEach(el => { el.disabled = true; });
+    const note = document.createElement("p"); note.textContent = "Դպրոցի տվյալները փոփոխում է ադմինիստրատորը։";
     app.querySelector(".school-settings")?.append(note);
   }
 }
