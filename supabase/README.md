@@ -44,7 +44,7 @@ npm run supabase:lint
 | `admin-b@local.test` | Դպրոց Բ — admin |
 | `no-school@local.test` | դպրոց չունի |
 
-Seed-ը ստեղծում է երկու դպրոց, երկու դպրոցներում նույն անունով դասարան/առարկա, նույն անունով առանձին ուսուցիչներ, nullable teacher-ով դաս և վերարտադրվող UUID-ներ։ Սա production bootstrap չէ և remote միջավայր ինքնաբերաբար չի ուղարկվում։
+Seed-ը ստեղծում է երկու դպրոց, երկու դպրոցներում նույն անունով դասարան/առարկա, նույն անունով առանձին դասատուներ, nullable teacher-ով դաս և վերարտադրվող UUID-ներ։ Սա production bootstrap չէ և remote միջավայր ինքնաբերաբար չի ուղարկվում։
 
 ## Կառուցվածք և անվտանգության սահմաններ
 
@@ -55,6 +55,6 @@ Seed-ը ստեղծում է երկու դպրոց, երկու դպրոցներո
 - `seed.sql` — միայն local Auth/data fixtures։
 - `tests/` — pgTAP schema, constraint, RLS և երկու-connection concurrency ստուգումներ։
 
-RLS-ը anonymous draft հասանելիություն չի տալիս։ Admin-ը կառավարում է դպրոցի կարգավորումներն ու դասաժամերը, scheduler-ը՝ դասարանները, առարկաները, ուսուցիչներն ու դասերը։ Membership-ի փոփոխությունը և publication write-ը client դերերին փակ են։ Service-role key repository-ում կամ frontend-ում չկա։
+RLS-ը anonymous draft հասանելիություն չի տալիս։ Admin-ը կառավարում է դպրոցի կարգավորումներն ու դասաժամերը, scheduler-ը՝ դասարանները, առարկաները, դասատուներն ու դասերը։ Membership-ի փոփոխությունը և publication write-ը client դերերին փակ են։ Service-role key repository-ում կամ frontend-ում չկա։
 
 Hosted կապը և Teacher Auth/data adapter-ը իրականացված են։ Browser-ի տեղային տվյալների ներմուծումն առանձին հաջորդ աշխատանք է։ Publication RPC-ն ու public read contract-ն իրականացված են նոր `202609240001_publication.sql` migration-ում. տես [PUBLICATION.md](PUBLICATION.md)։ Student-ի կապակցումը հաջորդ փուլն է։

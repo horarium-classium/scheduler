@@ -1,5 +1,5 @@
 import "./style.css";
-import { findLessonConflict, isTimeSlotUsed, removeClassDraft, sortTimeSlots, validateTimeSlot, type SchoolClass, type Subject, type Teacher, type TimeSlot } from "./model";
+import { findLessonConflict, hasDuplicateTeacherName, isSubjectUsed, isTeacherUsed, isTimeSlotUsed, removeClassDraft, sortTimeSlots, validateSubjectName, validateTeacherName, validateTimeSlot, type SchoolClass, type Subject, type Teacher, type TimeSlot } from "./model";
 import { isValidTimezone, type TeacherState } from "./state";
 import { CloudWorkspace, SaveQueue, cloudError } from "./cloud-workspace";
 
@@ -9,6 +9,31 @@ export function mountEditor(workspace: CloudWorkspace, initial: TeacherState, ro
 const controller = new AbortController();
 interface Weekday { id: number; name: string; shortName: string; }
 type Page = "workspace" | "settings" | "preview";
+interface SubjectEditorState {
+  mode: "create" | "edit";
+  subjectId: number | null;
+  initialName: string;
+  initialColor: string;
+  name: string;
+  color: string;
+  returnFocusSelector: string;
+}
+interface TeacherEditorState {
+  mode: "create" | "edit";
+  teacherId: number | null;
+  initialName: string;
+  name: string;
+  returnFocusSelector: string;
+}
+interface SlotEditorState {
+  mode: "create" | "edit";
+  slotId: number | null;
+  initialStart: string;
+  initialEnd: string;
+  start: string;
+  end: string;
+  returnFocusSelector: string;
+}
 const SCHOOL_ID = 1;
 const palette = ["#dbeafe", "#dcfce7", "#fef3c7", "#fce7f3", "#ede9fe", "#ffedd5"];
 const weekdays: Weekday[] = [
@@ -49,13 +74,16 @@ syncBar.querySelector(".reload-cloud")?.addEventListener("click", async () => {
   try {
     const latest = await workspace.reload();
     if (disposed) return;
-    queue.pending = null; queue.error = ""; state = latest; dirty = false; publicationMessage = "";
+    queue.pending = null; queue.error = ""; state = latest; dirty = false; publicationMessage = ""; closeSettingsEditor(true);
     renderApp(); updateSyncStatus();
   } catch { if (!disposed) syncBar.querySelector("span")!.textContent = "Բեռնումը չհաջողվեց։ Սևագիրը չի փոխվել։"; }
   finally { button.disabled = false; if (app && !disposed) app.inert = false; }
 });
 let page: Page = "workspace";
 let dirty = false;
+let subjectEditor: SubjectEditorState | null = null;
+let teacherEditor: TeacherEditorState | null = null;
+let slotEditor: SlotEditorState | null = null;
 
 let pendingCell: { classId: number; weekdayId: number; timeSlotId: number } | null = null;
 
@@ -225,7 +253,7 @@ function renderWeekTable(classId: number, container: Element, editable: boolean)
 function openLessonDialog(classId: number, weekdayId: number, timeSlotId: number, returnFocus: HTMLButtonElement): void {
   const schoolClass = state.classes.find((item) => item.id === classId); const weekday = weekdays.find((item) => item.id === weekdayId); const slot = state.timeSlots.find((item) => item.id === timeSlotId);
   const lesson = state.lessons.find((item) => item.classId === classId && item.weekday === weekdayId && item.timeSlotId === timeSlotId); if (!schoolClass || !weekday || !slot) return;
-  const dialog = document.createElement("dialog"); dialog.className = "lesson-dialog"; dialog.innerHTML = `<form method="dialog" class="dialog-form" novalidate><header><h2></h2><button class="dialog-close cancel-dialog" type="button" aria-label="Փակել">×</button></header><div class="no-subjects" hidden><p>Դաս ավելացնելու համար նախ ստեղծեք առարկա։</p><button class="primary-button subject-settings-link" type="button">Ավելացնել առարկա</button></div><label class="subject-field">Առարկա<select name="subject" required></select></label><label class="teacher-field">Ուսուցիչ<select name="teacher"><option value="">Նշված չէ</option></select></label><label>Մեկնաբանություն<textarea name="comment" rows="3"></textarea></label><p class="form-error" role="alert"></p><footer><button class="danger-button delete-button" type="button" ${lesson ? "" : "hidden"}>Ջնջել</button><span></span><button class="secondary-button cancel-dialog" type="button">Չեղարկել</button><button class="primary-button save-lesson" type="submit">Պահել</button></footer></form>`; document.body.append(dialog);
+  const dialog = document.createElement("dialog"); dialog.className = "lesson-dialog"; dialog.innerHTML = `<form method="dialog" class="dialog-form" novalidate><header><h2></h2><button class="dialog-close cancel-dialog" type="button" aria-label="Փակել">×</button></header><div class="no-subjects" hidden><p>Դաս ավելացնելու համար նախ ստեղծեք առարկա։</p><button class="primary-button subject-settings-link" type="button">Ավելացնել առարկա</button></div><label class="subject-field">Առարկա<select name="subject" required></select></label><label class="teacher-field">Դասատու<select name="teacher"><option value="">Նշված չէ</option></select></label><label>Մեկնաբանություն<textarea name="comment" rows="3"></textarea></label><p class="form-error" role="alert"></p><footer><button class="danger-button delete-button" type="button" ${lesson ? "" : "hidden"}>Ջնջել</button><span></span><button class="secondary-button cancel-dialog" type="button">Չեղարկել</button><button class="primary-button save-lesson" type="submit">Պահել</button></footer></form>`; document.body.append(dialog);
   const heading = dialog.querySelector("h2"); if (heading) heading.textContent = `${schoolClass.name} — ${weekday.name} ${slot.start}–${slot.end}`;
   let conflictTarget: number | null = null;
   const form = dialog.querySelector<HTMLFormElement>("form"); const subject = dialog.querySelector<HTMLSelectElement>('[name="subject"]'); const teacher = dialog.querySelector<HTMLSelectElement>('[name="teacher"]'); const comment = dialog.querySelector<HTMLTextAreaElement>('[name="comment"]'); const error = dialog.querySelector(".form-error");
@@ -234,7 +262,7 @@ function openLessonDialog(classId: number, weekdayId: number, timeSlotId: number
   if (comment) comment.value = lesson?.comment ?? "";
   if (!state.subjects.length) { dialog.querySelector<HTMLElement>(".no-subjects")!.hidden = false; dialog.querySelector<HTMLElement>(".subject-field")!.hidden = true; dialog.querySelector<HTMLButtonElement>(".save-lesson")!.disabled = true; }
   dialog.querySelector(".subject-settings-link")?.addEventListener("click", () => { pendingCell = { classId, weekdayId, timeSlotId }; dialog.close("settings"); });
-  form?.addEventListener("submit", (event) => { event.preventDefault(); const subjectId = Number(subject?.value); const subjectExists = state.subjects.some((item) => item.id === subjectId); if (!subjectExists) { if (error) error.textContent = "Ընտրեք առարկա։"; subject?.focus(); return; } const teacherId = teacher?.value ? Number(teacher.value) : null; if (teacherId !== null && !state.teachers.some((item) => item.id === teacherId)) { if (error) error.textContent = "Ընտրված ուսուցիչը գոյություն չունի։"; return; }
+  form?.addEventListener("submit", (event) => { event.preventDefault(); const subjectId = Number(subject?.value); const subjectExists = state.subjects.some((item) => item.id === subjectId); if (!subjectExists) { if (error) error.textContent = "Ընտրեք առարկա։"; subject?.focus(); return; } const teacherId = teacher?.value ? Number(teacher.value) : null; if (teacherId !== null && !state.teachers.some((item) => item.id === teacherId)) { if (error) error.textContent = "Ընտրված դասատուն գոյություն չունի։"; return; }
     const candidate = { id: lesson?.id ?? nextId(state.lessons), classId, weekday: weekdayId, timeSlotId, subjectId, teacherId, comment: comment?.value.trim() ?? "" };
     const conflict = findLessonConflict(candidate, state.lessons);
     error?.replaceChildren();
@@ -242,7 +270,7 @@ function openLessonDialog(classId: number, weekdayId: number, timeSlotId: number
       const other = conflict.lesson;
       const otherClass = state.classes.find((item) => item.id === other.classId);
       const otherSubject = state.subjects.find((item) => item.id === other.subjectId);
-      const teacherName = state.teachers.find((item) => item.id === teacherId)?.name ?? "Ուսուցիչը";
+      const teacherName = state.teachers.find((item) => item.id === teacherId)?.name ?? "Դասատուն";
       if (error) {
         error.textContent = conflict.kind === "cell" ? "Այս վանդակում արդեն դաս կա։" : `${teacherName}ը այս ժամին արդեն դաս ունի․ ${otherClass?.name} · ${weekday.name} · ${slot.start}–${slot.end} · ${otherSubject?.name}։ Փոփոխությունը չի պահպանվել։`;
         const open = document.createElement("button");
@@ -256,7 +284,7 @@ function openLessonDialog(classId: number, weekdayId: number, timeSlotId: number
  if (lesson) { lesson.subjectId = subjectId; lesson.teacherId = teacherId; lesson.comment = comment?.value.trim() ?? ""; } else state.lessons.push(candidate); persist(); dialog.close("changed"); });
   dialog.querySelector(".delete-button")?.addEventListener("click", () => { if (lesson) state.lessons.splice(state.lessons.indexOf(lesson), 1); persist(); dialog.close("changed"); });
   dialog.querySelectorAll(".cancel-dialog").forEach((button) => button.addEventListener("click", () => dialog.close("cancel")));
-  dialog.addEventListener("close", () => { const changed = dialog.returnValue === "changed"; const goToSettings = dialog.returnValue === "settings"; dialog.remove(); if (dialog.returnValue === "conflict" && conflictTarget !== null) { state.lastSelectedClassId = conflictTarget; page = "workspace"; persist(); renderApp(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${weekdayId}"][data-time-slot="${timeSlotId}"]`)?.focus()); return; } if (changed) renderWorkspace(); if (goToSettings) { page = "settings"; renderApp(); requestAnimationFrame(() => document.querySelector("#add-subject")?.scrollIntoView({ block: "center" })); return; } requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${weekdayId}"][data-time-slot="${timeSlotId}"]`)?.focus() ?? returnFocus.focus()); });
+  dialog.addEventListener("close", () => { const changed = dialog.returnValue === "changed"; const goToSettings = dialog.returnValue === "settings"; dialog.remove(); if (dialog.returnValue === "conflict" && conflictTarget !== null) { state.lastSelectedClassId = conflictTarget; page = "workspace"; persist(); renderApp(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${weekdayId}"][data-time-slot="${timeSlotId}"]`)?.focus()); return; } if (changed) renderWorkspace(); if (goToSettings) { page = "settings"; renderApp(); openSubjectCreator(); return; } requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${weekdayId}"][data-time-slot="${timeSlotId}"]`)?.focus() ?? returnFocus.focus()); });
   dialog.showModal(); subject?.focus();
 }
 
@@ -268,10 +296,10 @@ function renderPreview(): void {
 
 function renderSettings(): void {
   if (!app) return;
-  app.innerHTML = `<main class="page settings-page"><header class="editor-header settings-header"><button id="back-button" class="back-button" type="button">← Խմբագրիչ</button><div><h1>Կարգավորումներ</h1><p>Ընդհանուր տվյալներ և տեղեկատուներ</p></div><span></span></header><div id="notices"></div><section class="panel school-settings"><h2>Դպրոցի տվյալներ</h2><div class="school-form"><label>Դպրոցի անուն<input id="school-name-input" autocomplete="organization"></label><label>Ժամային գոտի<input id="timezone-input" list="timezone-list" autocomplete="off"><datalist id="timezone-list"><option value="Asia/Yerevan"><option value="Europe/Moscow"><option value="Europe/Paris"><option value="America/New_York"></datalist></label><button id="save-school" class="primary-button settings-icon save-icon" type="button" aria-label="Պահել" title="Պահել"><span aria-hidden="true">✓</span></button></div><p id="school-error" class="form-error" role="alert"></p></section><section class="panel directory-settings"><div class="panel-header"><h2>Առարկաներ</h2><button id="add-subject" class="primary-button" type="button">+ Ավելացնել առարկա</button></div><div id="subject-list" class="directory-list"></div></section><section class="panel directory-settings"><div class="panel-header"><h2>Ուսուցիչներ</h2><button id="add-teacher" class="primary-button" type="button">+ Ավելացնել ուսուցիչ</button></div><div id="teacher-list" class="directory-list"></div></section><section class="panel slot-settings"><div class="panel-header"><h2>Դասաժամեր</h2><button id="add-slot" class="primary-button" type="button">+ Ավելացնել դասաժամ</button></div><p id="settings-message" class="settings-message" role="status"></p><div class="slot-table-wrapper"><table class="slot-table"><thead><tr><th>№</th><th>Սկիզբ</th><th>Ավարտ</th><th>Գործողություն</th></tr></thead><tbody id="slot-list"></tbody></table></div></section></main>`;
+  app.innerHTML = `<main class="page settings-page"><header class="editor-header settings-header"><button id="back-button" class="back-button" type="button">← Խմբագրիչ</button><div><h1>Կարգավորումներ</h1><p>Ընդհանուր տվյալներ և տեղեկատուներ</p></div><span></span></header><div id="notices"></div><section class="panel school-settings"><div class="panel-header"><h2>Դպրոցի տվյալներ</h2><button id="save-school" class="primary-button" type="button">Պահպանել</button></div><div class="school-form"><label>Դպրոցի անուն<input id="school-name-input" autocomplete="organization"></label><label>Ժամային գոտի<input id="timezone-input" list="timezone-list" autocomplete="off"><datalist id="timezone-list"><option value="Asia/Yerevan"><option value="Europe/Moscow"><option value="Europe/Paris"><option value="America/New_York"></datalist></label></div><p id="school-error" class="form-error" role="alert"></p></section><section class="panel directory-settings"><div class="panel-header"><h2>Առարկաներ</h2><button id="add-subject" class="primary-button" type="button">+ Ավելացնել առարկա</button></div><div id="subject-list" class="directory-list"></div></section><section class="panel directory-settings"><div class="panel-header"><h2>Դասատուներ</h2><button id="add-teacher" class="primary-button" type="button">+ Ավելացնել դասատու</button></div><div id="teacher-list" class="directory-list"></div></section><section class="panel slot-settings"><div class="panel-header"><h2>Դասաժամեր</h2><button id="add-slot" class="primary-button" type="button">+ Ավելացնել դասաժամ</button></div><p id="settings-message" class="settings-message" role="status"></p><div id="slot-list" class="directory-list slot-list"></div></section></main>`;
   const notices = document.querySelector("#notices"); if (notices) renderNotices(notices);
   const schoolInput = document.querySelector<HTMLInputElement>("#school-name-input"); const timezoneInput = document.querySelector<HTMLInputElement>("#timezone-input"); if (schoolInput) schoolInput.value = state.school.name; if (timezoneInput) timezoneInput.value = state.school.timezone;
-  document.querySelector("#back-button")?.addEventListener("click", () => { page = "workspace"; renderApp(); if (pendingCell) { const cell = pendingCell; pendingCell = null; requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${cell.weekdayId}"][data-time-slot="${cell.timeSlotId}"]`)?.focus()); } });
+  document.querySelector("#back-button")?.addEventListener("click", () => { if (!closeSettingsEditor()) return; page = "workspace"; renderApp(); if (pendingCell) { const cell = pendingCell; pendingCell = null; requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${cell.weekdayId}"][data-time-slot="${cell.timeSlotId}"]`)?.focus()); } });
   document.querySelector("#save-school")?.addEventListener("click", () => { const name = schoolInput?.value.trim() ?? ""; const timezone = timezoneInput?.value.trim() ?? ""; const error = document.querySelector("#school-error"); if (!name) { if (error) error.textContent = "Դպրոցի անունը պարտադիր է։"; return; } if (!isValidTimezone(timezone)) { if (error) error.textContent = "Մուտքագրեք վավեր IANA ժամային գոտի, օրինակ՝ Asia/Yerevan։"; return; } state.school = { name, timezone }; commit(); });
   document.querySelector("#add-subject")?.addEventListener("click", addSubject); document.querySelector("#add-teacher")?.addEventListener("click", addTeacher);
   document.querySelector("#add-slot")?.addEventListener("click", addSlotEditor); renderSubjects(); renderTeachers(); renderTimeSlots();
@@ -282,63 +310,174 @@ function renderSettings(): void {
   }
 }
 
-function normalizedDirectoryName(value: string): string { return value.trim().toLocaleLowerCase("hy"); }
-function subjectNameError(name: string, excludedId?: number): string | null { if (!name.trim()) return "Առարկայի անունը պարտադիր է։"; return state.subjects.some((item) => item.id !== excludedId && normalizedDirectoryName(item.name) === normalizedDirectoryName(name)) ? "Այս անունով առարկա արդեն կա։" : null; }
+function settingsEditorChanged(): boolean {
+  if (subjectEditor) return subjectEditor.name !== subjectEditor.initialName || subjectEditor.color !== subjectEditor.initialColor;
+  if (teacherEditor) return teacherEditor.name !== teacherEditor.initialName;
+  if (slotEditor) return slotEditor.start !== slotEditor.initialStart || slotEditor.end !== slotEditor.initialEnd;
+  return false;
+}
+function closeSettingsEditor(force = false): boolean {
+  if (!force && settingsEditorChanged() && !confirm("Չպահպանված փոփոխությունները կկորչեն։ Շարունակե՞լ։")) return false;
+  subjectEditor = null; teacherEditor = null; slotEditor = null;
+  return true;
+}
+function renderSettingsDirectories(): void { renderSubjects(); renderTeachers(); renderTimeSlots(); }
+function focusSettingsEditor(selector: string): void { requestAnimationFrame(() => document.querySelector<HTMLInputElement>(selector)?.focus()); }
+function openSubjectEditor(item: Subject): void {
+  if (subjectEditor?.mode === "edit" && subjectEditor.subjectId === item.id) return;
+  if (!closeSettingsEditor()) return;
+  subjectEditor = { mode: "edit", subjectId: item.id, initialName: item.name, initialColor: item.color, name: item.name, color: item.color, returnFocusSelector: `[data-subject-id="${item.id}"]` };
+  renderSettingsDirectories(); focusSettingsEditor(".subject-editor-name");
+}
+function openSubjectCreator(): void {
+  if (subjectEditor?.mode === "create") { focusSettingsEditor(".subject-editor-name"); return; }
+  if (!closeSettingsEditor()) return;
+  subjectEditor = { mode: "create", subjectId: null, initialName: "", initialColor: palette[0]!, name: "", color: palette[0]!, returnFocusSelector: "#add-subject" };
+  renderSettingsDirectories(); focusSettingsEditor(".subject-editor-name");
+}
 function renderSubjects(): void {
   const list = document.querySelector("#subject-list"); if (!list) return; list.replaceChildren();
-  if (!state.subjects.length) { list.textContent = "Առարկաներ դեռ չկան։"; list.classList.add("empty-directory"); return; }
-  for (const item of state.subjects) list.append(createSubjectRow(item));
+  list.classList.remove("empty-directory");
+  if (subjectEditor?.mode === "create") list.append(createSubjectEditor());
+  if (!state.subjects.length && subjectEditor?.mode !== "create") { list.textContent = "Առարկաներ դեռ չկան։"; list.classList.add("empty-directory"); return; }
+  for (const item of state.subjects) list.append(subjectEditor?.mode === "edit" && subjectEditor.subjectId === item.id ? createSubjectEditor(item) : createSubjectRow(item));
 }
 function createSubjectRow(item: Subject): HTMLElement {
-  const row = document.createElement("div"); row.className = "directory-row subject-row"; row.innerHTML = `<span class="color-swatch"></span><input class="directory-name" aria-label="Առարկայի անուն"><div class="subject-color color-palette" role="group" aria-label="Առարկայի գույն"></div><button class="secondary-button save-directory settings-icon save-icon" type="button" aria-label="Պահել" title="Պահել"><span aria-hidden="true">✓</span></button><button class="danger-button delete-directory settings-icon delete-icon" type="button" aria-label="Ջնջել" title="Ջնջել"><span aria-hidden="true">×</span></button><p class="row-error" role="alert"></p>`;
-  const name = row.querySelector<HTMLInputElement>(".directory-name")!; const color = row.querySelector<HTMLElement>(".subject-color")!; const swatch = row.querySelector<HTMLElement>(".color-swatch")!; name.value = item.name;
-  let selectedColor = item.color;
+  const button = document.createElement("button"); button.type = "button"; button.className = "subject-summary"; button.dataset.subjectId = String(item.id); button.setAttribute("aria-label", `Խմբագրել «${item.name}» առարկան`);
+  const swatch = document.createElement("span"); swatch.className = "color-swatch"; swatch.style.backgroundColor = item.color; swatch.setAttribute("aria-hidden", "true");
+  const name = document.createElement("span"); name.className = "subject-summary-name"; name.textContent = item.name;
+  const edit = document.createElement("span"); edit.className = "subject-edit-icon"; edit.textContent = "✎"; edit.setAttribute("aria-hidden", "true");
+  button.append(swatch, name, edit); button.addEventListener("click", () => openSubjectEditor(item)); return button;
+}
+function createSubjectEditor(item?: Subject): HTMLElement {
+  const editor = subjectEditor;
+  if (!editor) return document.createElement("div");
+  const form = document.createElement("form"); form.className = "subject-editor"; form.noValidate = true;
+  form.innerHTML = `<label>Անուն<input class="subject-editor-name" autocomplete="off"></label><fieldset><legend>Գույն</legend><div class="subject-color color-palette" role="group" aria-label="Առարկայի գույն"></div></fieldset><p class="row-error" role="alert"></p><footer>${item ? `<button class="subject-delete" type="button">Ջնջել առարկան</button>` : "<span></span>"}<button class="secondary-button cancel-subject-editor" type="button">Չեղարկել</button><button class="primary-button save-subject-editor" type="submit">${item ? "Պահպանել" : "Ավելացնել"}</button></footer>`;
+  const name = form.querySelector<HTMLInputElement>(".subject-editor-name")!; const color = form.querySelector<HTMLElement>(".subject-color")!; name.value = editor.name;
   const colorNames = ["Կապույտ", "Կանաչ", "Դեղին", "Վարդագույն", "Մանուշակագույն", "Նարնջագույն"];
-  const colors = palette.includes(item.color) ? palette : [item.color, ...palette];
+  const colors = palette.includes(editor.color) ? palette : [editor.color, ...palette];
   const updateSwatch = (): void => {
-    swatch.style.backgroundColor = selectedColor;
-    color.querySelectorAll<HTMLButtonElement>("button").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.color === selectedColor)));
+    color.querySelectorAll<HTMLButtonElement>("button").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.color === editor.color)));
   };
   for (const value of colors) {
     const button = document.createElement("button"); button.type = "button"; button.className = "color-choice";
     button.dataset.color = value; button.style.backgroundColor = value;
     button.title = colorNames[palette.indexOf(value)] ?? "Ներկայիս գույն"; button.setAttribute("aria-label", button.title);
-    button.addEventListener("click", () => { selectedColor = value; updateSwatch(); }); color.append(button);
+    button.addEventListener("click", () => { editor.color = value; updateSwatch(); }); color.append(button);
   }
   updateSwatch();
-  row.querySelector(".save-directory")?.addEventListener("click", () => { const error = subjectNameError(name.value, item.id); const errorElement = row.querySelector(".row-error"); if (errorElement) errorElement.textContent = error ?? ""; if (error) return; item.name = name.value.trim(); item.color = selectedColor; commit(); });
-  row.querySelector(".delete-directory")?.addEventListener("click", () => { if (state.lessons.some((lesson) => lesson.subjectId === item.id)) { const error = row.querySelector(".row-error"); if (error) error.textContent = "Չի կարելի ջնջել․ առարկան օգտագործվում է դասացուցակում։"; return; } state.subjects.splice(state.subjects.indexOf(item), 1); commit(); }); return row;
+  name.addEventListener("input", () => { editor.name = name.value; });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault(); editor.name = name.value;
+    const error = validateSubjectName(editor.name, state.subjects, item?.id); const errorElement = form.querySelector(".row-error");
+    if (errorElement) errorElement.textContent = error ?? ""; if (error) { name.focus(); return; }
+    if (item) { item.name = editor.name.trim(); item.color = editor.color; subjectEditor = null; commit(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-subject-id="${item.id}"]`)?.focus()); return; }
+    const created = { id: nextId(state.subjects), schoolId: SCHOOL_ID, name: editor.name.trim(), color: editor.color }; state.subjects.push(created); subjectEditor = null; commit(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-subject-id="${created.id}"]`)?.focus());
+  });
+  form.querySelector(".cancel-subject-editor")?.addEventListener("click", () => { const selector = editor.returnFocusSelector; closeSettingsEditor(true); renderSettingsDirectories(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(selector)?.focus()); });
+  form.querySelector(".subject-delete")?.addEventListener("click", () => {
+    if (!item) return; const error = form.querySelector(".row-error");
+    if (isSubjectUsed(item.id, state.lessons)) { if (error) error.textContent = "Չի կարելի ջնջել․ առարկան օգտագործվում է դասացուցակում։"; return; }
+    if (!confirm(`Ջնջե՞լ «${item.name}» առարկան։`)) return;
+    state.subjects.splice(state.subjects.indexOf(item), 1); subjectEditor = null; commit(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>("#add-subject")?.focus());
+  });
+  form.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.preventDefault(); const selector = editor.returnFocusSelector; closeSettingsEditor(true); renderSettingsDirectories(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(selector)?.focus()); } });
+  return form;
 }
-function addSubject(): void { const name = prompt("Առարկայի անունը:"); if (name === null) return; const error = subjectNameError(name); if (error) { alert(error); return; } state.subjects.push({ id: nextId(state.subjects), schoolId: SCHOOL_ID, name: name.trim(), color: palette[0]! }); commit(); }
+function addSubject(): void { openSubjectCreator(); }
 
 function renderTeachers(): void {
-  const list = document.querySelector("#teacher-list"); if (!list) return; list.replaceChildren(); if (!state.teachers.length) { list.textContent = "Ուսուցիչներ դեռ չկան։ Դասերը կարելի է պահել առանց ուսուցչի։"; list.classList.add("empty-directory"); return; }
-  for (const item of state.teachers) list.append(createTeacherRow(item));
+  const list = document.querySelector("#teacher-list"); if (!list) return; list.replaceChildren(); list.classList.remove("empty-directory");
+  if (teacherEditor?.mode === "create") list.append(createTeacherEditor());
+  if (!state.teachers.length && teacherEditor?.mode !== "create") { list.textContent = "Դասատուներ դեռ չկան։ Դասերը կարելի է պահել առանց դասատուի։"; list.classList.add("empty-directory"); return; }
+  for (const item of state.teachers) list.append(teacherEditor?.mode === "edit" && teacherEditor.teacherId === item.id ? createTeacherEditor(item) : createTeacherRow(item));
 }
 function createTeacherRow(item: Teacher): HTMLElement {
-  const row = document.createElement("div"); row.className = "directory-row teacher-row"; row.innerHTML = `<input class="directory-name" aria-label="Ուսուցչի անուն"><button class="secondary-button save-directory settings-icon save-icon" type="button" aria-label="Պահել" title="Պահել"><span aria-hidden="true">✓</span></button><button class="danger-button delete-directory settings-icon delete-icon" type="button" aria-label="Ջնջել" title="Ջնջել"><span aria-hidden="true">×</span></button><p class="row-error" role="alert"></p>`; const name = row.querySelector<HTMLInputElement>(".directory-name")!; name.value = item.name;
-  row.querySelector(".save-directory")?.addEventListener("click", () => { const value = name.value.trim(); const error = row.querySelector(".row-error"); if (!value) { if (error) error.textContent = "Ուսուցչի անունը պարտադիր է։"; return; } item.name = value; commit(); });
-  row.querySelector(".delete-directory")?.addEventListener("click", () => { if (state.lessons.some((lesson) => lesson.teacherId === item.id)) { const error = row.querySelector(".row-error"); if (error) error.textContent = "Չի կարելի ջնջել․ ուսուցիչը նշանակված է դասի։"; return; } state.teachers.splice(state.teachers.indexOf(item), 1); commit(); }); return row;
+  const button = document.createElement("button"); button.type = "button"; button.className = "directory-summary teacher-summary"; button.dataset.teacherId = String(item.id); button.setAttribute("aria-label", `Խմբագրել «${item.name}» դասատուին`);
+  button.innerHTML = `<span class="directory-summary-icon" aria-hidden="true"></span><span class="directory-summary-name"></span><span class="directory-edit-icon" aria-hidden="true">✎</span>`;
+  button.querySelector(".directory-summary-icon")!.textContent = Array.from(item.name.trim())[0] ?? "Դ"; button.querySelector(".directory-summary-name")!.textContent = item.name; button.addEventListener("click", () => openTeacherEditor(item)); return button;
 }
-function addTeacher(): void { const name = prompt("Ուսուցչի անունը:"); if (name === null) return; if (!name.trim()) { alert("Ուսուցչի անունը պարտադիր է։"); return; } const duplicate = state.teachers.some((item) => normalizedDirectoryName(item.name) === normalizedDirectoryName(name)); if (duplicate && !confirm("Այս անունով ուսուցիչ արդեն կա։ Ավելացնե՞լ առանձին մարդ որպես նոր գրառում։")) return; state.teachers.push({ id: nextId(state.teachers), schoolId: SCHOOL_ID, name: name.trim() }); commit(); }
+function openTeacherEditor(item: Teacher): void {
+  if (teacherEditor?.mode === "edit" && teacherEditor.teacherId === item.id) return;
+  if (!closeSettingsEditor()) return;
+  teacherEditor = { mode: "edit", teacherId: item.id, initialName: item.name, name: item.name, returnFocusSelector: `[data-teacher-id="${item.id}"]` };
+  renderSettingsDirectories(); focusSettingsEditor(".teacher-editor-name");
+}
+function openTeacherCreator(): void {
+  if (teacherEditor?.mode === "create") { focusSettingsEditor(".teacher-editor-name"); return; }
+  if (!closeSettingsEditor()) return;
+  teacherEditor = { mode: "create", teacherId: null, initialName: "", name: "", returnFocusSelector: "#add-teacher" };
+  renderSettingsDirectories(); focusSettingsEditor(".teacher-editor-name");
+}
+function createTeacherEditor(item?: Teacher): HTMLElement {
+  const editor = teacherEditor; if (!editor) return document.createElement("div");
+  const form = document.createElement("form"); form.className = "directory-editor teacher-editor"; form.noValidate = true;
+  form.innerHTML = `<label>Անուն<input class="teacher-editor-name" autocomplete="off"></label><p class="row-error" role="alert"></p><footer>${item ? `<button class="directory-delete teacher-delete" type="button">Ջնջել դասատուին</button>` : "<span></span>"}<button class="secondary-button cancel-teacher-editor" type="button">Չեղարկել</button><button class="primary-button" type="submit">${item ? "Պահպանել" : "Ավելացնել"}</button></footer>`;
+  const name = form.querySelector<HTMLInputElement>(".teacher-editor-name")!; name.value = editor.name; name.addEventListener("input", () => { editor.name = name.value; });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault(); editor.name = name.value; const error = validateTeacherName(editor.name); const errorElement = form.querySelector(".row-error");
+    if (errorElement) errorElement.textContent = error ?? ""; if (error) { name.focus(); return; }
+    if (hasDuplicateTeacherName(editor.name, state.teachers, item?.id) && !confirm("Այս անունով դասատու արդեն կա։ Պահպանե՞լ որպես առանձին մարդ։")) { name.focus(); return; }
+    if (item) { item.name = editor.name.trim(); teacherEditor = null; commit(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-teacher-id="${item.id}"]`)?.focus()); return; }
+    const created = { id: nextId(state.teachers), schoolId: SCHOOL_ID, name: editor.name.trim() }; state.teachers.push(created); teacherEditor = null; commit(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-teacher-id="${created.id}"]`)?.focus());
+  });
+  form.querySelector(".cancel-teacher-editor")?.addEventListener("click", () => { const selector = editor.returnFocusSelector; closeSettingsEditor(true); renderSettingsDirectories(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(selector)?.focus()); });
+  form.querySelector(".teacher-delete")?.addEventListener("click", () => {
+    if (!item) return; const error = form.querySelector(".row-error");
+    if (isTeacherUsed(item.id, state.lessons)) { if (error) error.textContent = "Չի կարելի ջնջել․ դասատուն նշանակված է դասի։"; return; }
+    if (!confirm(`Ջնջե՞լ «${item.name}» դասատուին։`)) return;
+    state.teachers.splice(state.teachers.indexOf(item), 1); teacherEditor = null; commit(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>("#add-teacher")?.focus());
+  });
+  form.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.preventDefault(); const selector = editor.returnFocusSelector; closeSettingsEditor(true); renderSettingsDirectories(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(selector)?.focus()); } });
+  return form;
+}
+function addTeacher(): void { openTeacherCreator(); }
 
 function renderTimeSlots(): void {
-  const list = document.querySelector<HTMLTableSectionElement>("#slot-list"); if (!list) return; list.replaceChildren(); const slots = sortTimeSlots(state.timeSlots.filter((item) => item.schoolId === SCHOOL_ID));
-  if (!slots.length) { const row = list.insertRow(); const cell = row.insertCell(); cell.colSpan = 4; cell.className = "empty-settings"; cell.textContent = "Դասաժամեր չկան։ Ավելացրեք առաջին դասաժամը։"; return; }
-  slots.forEach((slot, index) => appendSlotRow(list, slot, index + 1));
+  const list = document.querySelector("#slot-list"); if (!list) return; list.replaceChildren(); list.classList.remove("empty-directory"); const slots = sortTimeSlots(state.timeSlots.filter((item) => item.schoolId === SCHOOL_ID));
+  if (slotEditor?.mode === "create") list.append(createSlotEditor());
+  if (!slots.length && slotEditor?.mode !== "create") { list.textContent = "Դասաժամեր չկան։ Ավելացրեք առաջին դասաժամը։"; list.classList.add("empty-directory"); return; }
+  slots.forEach((slot, index) => list.append(slotEditor?.mode === "edit" && slotEditor.slotId === slot.id ? createSlotEditor(slot) : createSlotRow(slot, index + 1)));
 }
-function appendSlotRow(list: HTMLTableSectionElement, slot: TimeSlot, number: number): void {
-  const row = document.createElement("tr"); row.innerHTML = `<td>${number}</td><td><input type="time" aria-label="Սկիզբ" name="start" required></td><td><input type="time" aria-label="Ավարտ" name="end" required></td><td><div class="slot-actions"><button class="secondary-button update-slot settings-icon save-icon" type="button" aria-label="Պահել" title="Պահել"><span aria-hidden="true">✓</span></button><button class="danger-button remove-slot settings-icon delete-icon" type="button" aria-label="Ջնջել" title="Ջնջել"><span aria-hidden="true">×</span></button></div><p class="row-error" role="alert"></p></td>`;
-  const start = row.querySelector<HTMLInputElement>('[name="start"]'); const end = row.querySelector<HTMLInputElement>('[name="end"]'); if (start) start.value = slot.start; if (end) end.value = slot.end;
-  row.querySelector(".update-slot")?.addEventListener("click", () => { const candidate = { start: start?.value ?? "", end: end?.value ?? "" }; const validationError = validateTimeSlot(candidate, state.timeSlots, SCHOOL_ID, slot.id); const error = row.querySelector(".row-error"); if (error) error.textContent = validationError ?? ""; if (validationError) return; slot.start = candidate.start; slot.end = candidate.end; persist(); renderSettings(); });
-  row.querySelector(".remove-slot")?.addEventListener("click", () => { if (isTimeSlotUsed(slot.id, state.lessons)) { const error = row.querySelector(".row-error"); if (error) error.textContent = "Չի կարելի ջնջել․ այս դասաժամն օգտագործվում է դասացուցակում։"; return; } state.timeSlots.splice(state.timeSlots.indexOf(slot), 1); persist(); renderSettings(); }); list.append(row);
+function createSlotRow(slot: TimeSlot, number: number): HTMLElement {
+  const button = document.createElement("button"); button.type = "button"; button.className = "directory-summary slot-summary"; button.dataset.slotId = String(slot.id); button.setAttribute("aria-label", `Խմբագրել ${slot.start}–${slot.end} դասաժամը`);
+  button.innerHTML = `<span class="slot-number"></span><span class="slot-range"></span><span class="directory-edit-icon" aria-hidden="true">✎</span>`;
+  button.querySelector(".slot-number")!.textContent = `${number}.`; button.querySelector(".slot-range")!.textContent = `${slot.start} – ${slot.end}`; button.addEventListener("click", () => openSlotEditor(slot)); return button;
+}
+function openSlotEditor(slot: TimeSlot): void {
+  if (slotEditor?.mode === "edit" && slotEditor.slotId === slot.id) return;
+  if (!closeSettingsEditor()) return;
+  slotEditor = { mode: "edit", slotId: slot.id, initialStart: slot.start, initialEnd: slot.end, start: slot.start, end: slot.end, returnFocusSelector: `[data-slot-id="${slot.id}"]` };
+  renderSettingsDirectories(); focusSettingsEditor(".slot-editor-start");
 }
 function addSlotEditor(): void {
-  const list = document.querySelector<HTMLTableSectionElement>("#slot-list"); if (!list || list.querySelector(".new-slot-row")) return; if (list.querySelector(".empty-settings")) list.replaceChildren();
-  const row = document.createElement("tr"); row.className = "new-slot-row"; row.innerHTML = `<td>Նոր</td><td><input type="time" aria-label="Սկիզբ" name="start" required></td><td><input type="time" aria-label="Ավարտ" name="end" required></td><td><div class="slot-actions"><button class="primary-button save-new-slot" type="button">Ավելացնել</button><button class="secondary-button cancel-new-slot" type="button">Չեղարկել</button></div><p class="row-error" role="alert"></p></td>`; list.append(row);
-  const start = row.querySelector<HTMLInputElement>('[name="start"]'); const end = row.querySelector<HTMLInputElement>('[name="end"]'); start?.focus();
-  row.querySelector(".save-new-slot")?.addEventListener("click", () => { const candidate = { start: start?.value ?? "", end: end?.value ?? "" }; const validationError = validateTimeSlot(candidate, state.timeSlots, SCHOOL_ID); const error = row.querySelector(".row-error"); if (error) error.textContent = validationError ?? ""; if (validationError) return; state.timeSlots.push({ id: nextId(state.timeSlots), schoolId: SCHOOL_ID, ...candidate }); persist(); renderSettings(); });
-  row.querySelector(".cancel-new-slot")?.addEventListener("click", renderTimeSlots);
+  if (slotEditor?.mode === "create") { focusSettingsEditor(".slot-editor-start"); return; }
+  if (!closeSettingsEditor()) return;
+  slotEditor = { mode: "create", slotId: null, initialStart: "", initialEnd: "", start: "", end: "", returnFocusSelector: "#add-slot" };
+  renderSettingsDirectories(); focusSettingsEditor(".slot-editor-start");
+}
+function createSlotEditor(slot?: TimeSlot): HTMLElement {
+  const editor = slotEditor; if (!editor) return document.createElement("div");
+  const form = document.createElement("form"); form.className = "directory-editor slot-editor"; form.noValidate = true;
+  form.innerHTML = `<div class="slot-fields"><label>Սկիզբ<input class="slot-editor-start" type="time" required></label><label>Ավարտ<input class="slot-editor-end" type="time" required></label></div><p class="row-error" role="alert"></p><footer>${slot ? `<button class="directory-delete slot-delete" type="button">Ջնջել դասաժամը</button>` : "<span></span>"}<button class="secondary-button cancel-slot-editor" type="button">Չեղարկել</button><button class="primary-button" type="submit">${slot ? "Պահպանել" : "Ավելացնել"}</button></footer>`;
+  const start = form.querySelector<HTMLInputElement>(".slot-editor-start")!; const end = form.querySelector<HTMLInputElement>(".slot-editor-end")!; start.value = editor.start; end.value = editor.end;
+  start.addEventListener("input", () => { editor.start = start.value; }); end.addEventListener("input", () => { editor.end = end.value; });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault(); editor.start = start.value; editor.end = end.value; const candidate = { start: editor.start, end: editor.end }; const validationError = validateTimeSlot(candidate, state.timeSlots, SCHOOL_ID, slot?.id); const error = form.querySelector(".row-error");
+    if (error) error.textContent = validationError ?? ""; if (validationError) { start.focus(); return; }
+    if (slot) { slot.start = candidate.start; slot.end = candidate.end; slotEditor = null; commit(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-slot-id="${slot.id}"]`)?.focus()); return; }
+    const created = { id: nextId(state.timeSlots), schoolId: SCHOOL_ID, ...candidate }; state.timeSlots.push(created); slotEditor = null; commit(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-slot-id="${created.id}"]`)?.focus());
+  });
+  form.querySelector(".cancel-slot-editor")?.addEventListener("click", () => { const selector = editor.returnFocusSelector; closeSettingsEditor(true); renderSettingsDirectories(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(selector)?.focus()); });
+  form.querySelector(".slot-delete")?.addEventListener("click", () => {
+    if (!slot) return; const error = form.querySelector(".row-error");
+    if (isTimeSlotUsed(slot.id, state.lessons)) { if (error) error.textContent = "Չի կարելի ջնջել․ այս դասաժամն օգտագործվում է դասացուցակում։"; return; }
+    if (!confirm(`Ջնջե՞լ ${slot.start}–${slot.end} դասաժամը։`)) return;
+    state.timeSlots.splice(state.timeSlots.indexOf(slot), 1); slotEditor = null; commit(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>("#add-slot")?.focus());
+  });
+  form.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.preventDefault(); const selector = editor.returnFocusSelector; closeSettingsEditor(true); renderSettingsDirectories(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(selector)?.focus()); } });
+  return form;
 }
 
 window.addEventListener("beforeunload", (event) => { if (!dirty && !publishing) return; event.preventDefault(); event.returnValue = ""; }, { signal: controller.signal });

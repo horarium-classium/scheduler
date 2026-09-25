@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isTimeSlotUsed, nextId, removeClassDraft, sortTimeSlots, validateTimeSlot, type Lesson, type TimeSlot } from "../src/model.ts";
+import { hasDuplicateTeacherName, isSubjectUsed, isTeacherUsed, isTimeSlotUsed, nextId, removeClassDraft, sortTimeSlots, validateSubjectName, validateTeacherName, validateTimeSlot, type Lesson, type Subject, type Teacher, type TimeSlot } from "../src/model.ts";
 
 const slots: TimeSlot[] = [
   { id: 4, schoolId: 1, start: "09:00", end: "09:45" },
@@ -24,6 +24,31 @@ test("detects a slot used in any class", () => {
   const lessons: Lesson[] = [{ id: 1, classId: 25, weekday: 6, timeSlotId: 9, subjectId: 1, teacherId: null, comment: "" }];
   assert.equal(isTimeSlotUsed(9, lessons), true);
   assert.equal(isTimeSlotUsed(4, lessons), false);
+});
+
+test("validates subject names and detects subjects used in lessons", () => {
+  const subjects: Subject[] = [
+    { id: 1, schoolId: 1, name: "Մաթեմատիկա", color: "#dbeafe" },
+    { id: 2, schoolId: 1, name: "Հայոց լեզու", color: "#dcfce7" },
+  ];
+  const lessons: Lesson[] = [{ id: 1, classId: 25, weekday: 1, timeSlotId: 4, subjectId: 2, teacherId: null, comment: "" }];
+  assert.match(validateSubjectName("  ", subjects) ?? "", /պարտադիր/);
+  assert.match(validateSubjectName(" մԱԹԵՄԱՏԻԿԱ ", subjects) ?? "", /արդեն կա/);
+  assert.equal(validateSubjectName("Մաթեմատիկա", subjects, 1), null);
+  assert.equal(validateSubjectName("Բնագիտություն", subjects), null);
+  assert.equal(isSubjectUsed(2, lessons), true);
+  assert.equal(isSubjectUsed(1, lessons), false);
+});
+
+test("validates teacher names, allows distinct duplicate records, and detects usage", () => {
+  const teachers: Teacher[] = [{ id: 1, schoolId: 1, name: "Անի Մկրտչյան" }, { id: 2, schoolId: 1, name: "Արամ Սարգսյան" }];
+  const lessons: Lesson[] = [{ id: 1, classId: 25, weekday: 1, timeSlotId: 4, subjectId: 2, teacherId: 2, comment: "" }];
+  assert.match(validateTeacherName("  ") ?? "", /պարտադիր/);
+  assert.equal(validateTeacherName("Անի Մկրտչյան"), null);
+  assert.equal(hasDuplicateTeacherName(" անի մԿՐՏՉՅԱՆ ", teachers), true);
+  assert.equal(hasDuplicateTeacherName("Անի Մկրտչյան", teachers, 1), false);
+  assert.equal(isTeacherUsed(2, lessons), true);
+  assert.equal(isTeacherUsed(1, lessons), false);
 });
 
 test("class removal deletes only its draft lessons and selects the next neighbor", () => {

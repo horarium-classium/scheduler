@@ -25,6 +25,31 @@ export function isTimeSlotUsed(timeSlotId: number, lessons: readonly Lesson[]): 
   return lessons.some((lesson) => lesson.timeSlotId === timeSlotId);
 }
 
+export function validateSubjectName(name: string, subjects: readonly Pick<Subject, "id" | "name">[], excludedId?: number): string | null {
+  const normalized = name.trim().toLocaleLowerCase("hy");
+  if (!normalized) return "Առարկայի անունը պարտադիր է։";
+  return subjects.some((subject) => subject.id !== excludedId && subject.name.trim().toLocaleLowerCase("hy") === normalized)
+    ? "Այս անունով առարկա արդեն կա։"
+    : null;
+}
+
+export function isSubjectUsed(subjectId: number, lessons: readonly Lesson[]): boolean {
+  return lessons.some((lesson) => lesson.subjectId === subjectId);
+}
+
+export function validateTeacherName(name: string): string | null {
+  return name.trim() ? null : "Դասատուի անունը պարտադիր է։";
+}
+
+export function hasDuplicateTeacherName(name: string, teachers: readonly Pick<Teacher, "id" | "name">[], excludedId?: number): boolean {
+  const normalized = name.trim().toLocaleLowerCase("hy");
+  return teachers.some((teacher) => teacher.id !== excludedId && teacher.name.trim().toLocaleLowerCase("hy") === normalized);
+}
+
+export function isTeacherUsed(teacherId: number, lessons: readonly Lesson[]): boolean {
+  return lessons.some((lesson) => lesson.teacherId === teacherId);
+}
+
 export function removeClassDraft(
   classId: number,
   classes: readonly SchoolClass[],

@@ -69,7 +69,7 @@ export function validateState(value: unknown): string | null {
     if (subjectNames.has(name)) return "Առարկաների անունները չեն կարող կրկնվել։";
     subjectNames.add(name);
   }
-  for (const item of value.teachers) if (!isRecord(item) || item.schoolId !== 1 || typeof item.name !== "string" || !item.name.trim()) return "Ուսուցիչներից մեկի կառուցվածքն անվավեր է։";
+  for (const item of value.teachers) if (!isRecord(item) || item.schoolId !== 1 || typeof item.name !== "string" || !item.name.trim()) return "Դասատուներից մեկի կառուցվածքն անվավեր է։";
 
   const classIds = new Set((value.classes as Record<string, unknown>[]).map((item) => item.id));
   const slotIds = new Set((value.timeSlots as Record<string, unknown>[]).map((item) => item.id));
@@ -82,7 +82,7 @@ export function validateState(value: unknown): string | null {
     if (cells.has(cell)) return "Նույն վանդակում մեկից ավելի դաս կա։";
     cells.add(cell);
   }
-  if (findScheduleConflicts(value.lessons as Lesson[]).length) return "Նույն ուսուցիչը նույն օրը և դասաժամին նշանակված է մի քանի դասարանում։";
+  if (findScheduleConflicts(value.lessons as Lesson[]).length) return "Նույն դասատուն նույն օրը և դասաժամին նշանակված է մի քանի դասարանում։";
   if (value.lastSelectedClassId !== null && (!Number.isInteger(value.lastSelectedClassId) || !classIds.has(value.lastSelectedClassId))) return "Վերջին ընտրված դասարանը գոյություն չունի։";
   return null;
 }

@@ -10,7 +10,7 @@ function snapshot(): WorkspaceSnapshot {
     classes: [{ id: id(2), school_id: school, name: "5Ա", sort_order: 10, public_id: id(90), active: true }],
     time_slots: [{ id: id(3), school_id: school, start_time: "09:00:00", end_time: "09:45:00", sort_order: 20 }],
     subjects: [{ id: id(4), school_id: school, name: "Առարկա", color: "#abcdef", active: true }],
-    teachers: [{ id: id(5), school_id: school, name: "Ուսուցիչ", active: true }],
+    teachers: [{ id: id(5), school_id: school, name: "Դասատու", active: true }],
     lessons: [{ id: id(6), school_id: school, class_id: id(2), time_slot_id: id(3), subject_id: id(4), teacher_id: null, weekday: 1, comment: "" }],
   }};
 }

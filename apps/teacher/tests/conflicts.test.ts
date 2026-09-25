@@ -21,7 +21,7 @@ test("duplicate cells are blocked even without a teacher", () => {
 
 test("full state validation rejects cross-class teacher collisions and allows a cleared assignment", () => {
   const state = { schemaVersion: SCHEMA_VERSION, school: { name: "Դպրոց", timezone: "Asia/Yerevan" }, classes: [{ id: 1, name: "5Ա" }, { id: 2, name: "5Բ" }], subjects: [{ id: 1, schoolId: 1, name: "Մաթեմատիկա", color: "#dbeafe" }], teachers: [{ id: 1, schoolId: 1, name: "Անի" }], timeSlots: [{ id: 1, schoolId: 1, start: "09:00", end: "09:45" }], lessons: [base, { ...base, id: 2, classId: 2 }], lastSelectedClassId: 1 };
-  assert.match(validateState(state) ?? "", /ուսուցիչ/);
+  assert.match(validateState(state) ?? "", /դասատու/);
   state.lessons[1] = { ...state.lessons[1]!, teacherId: null };
   assert.equal(validateState(state), null);
 });

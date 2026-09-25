@@ -8,7 +8,7 @@ function validState(): TeacherState {
     school: { name: "Դպրոց", timezone: "Asia/Yerevan" },
     classes: [{ id: 3, name: "Դասարան Ա" }, { id: 8, name: "Դասարան Բ" }],
     subjects: [{ id: 2, schoolId: 1, name: "Առարկա", color: "#dbeafe" }],
-    teachers: [{ id: 6, schoolId: 1, name: "Ուսուցիչ" }],
+    teachers: [{ id: 6, schoolId: 1, name: "Դասատու" }],
     timeSlots: [{ id: 4, schoolId: 1, start: "09:00", end: "09:45" }],
     lessons: [{ id: 7, classId: 3, weekday: 1, timeSlotId: 4, subjectId: 2, teacherId: 6, comment: "" }],
     lastSelectedClassId: 3,
