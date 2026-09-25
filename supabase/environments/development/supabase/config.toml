@@ -1,5 +1,5 @@
 project_id = "horarium-classium-dev"
 [auth]
-site_url = "https://armenbadal.github.io/horarium-classium/"
-additional_redirect_urls = ["http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:5173/activate.html", "https://armenbadal.github.io/horarium-classium/activate.html"]
+site_url = "https://armenbadal.github.io/horarium-classium/activate.html"
+additional_redirect_urls = ["http://localhost:5173/activate.html", "http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:5173/activate.html", "https://armenbadal.github.io/horarium-classium/activate.html"]
 enable_signup = false

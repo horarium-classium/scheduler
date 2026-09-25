@@ -1,3 +1,4 @@
+import { activationTarget } from "./invite";
 import "./style.css";
 import { createClient } from "@supabase/supabase-js";
 import { CloudWorkspace, cloudError } from "./cloud-workspace";
@@ -8,6 +9,11 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
 if (!url || !key) {
   app.innerHTML = `<main class="auth-page"><section class="auth-card"><h1>Կարգավորումը բացակայում է</h1><p role="alert">Supabase-ի հանրային հասցեն կամ publishable key-ը չի փոխանցվել build-ին։</p></section></main>`;
   throw new Error("Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY");
+}
+const target = activationTarget(location.href);
+if (target) {
+  history.replaceState(null, "", location.pathname);
+  location.replace(target);
 }
 const client = createClient(url, key, { auth: { detectSessionInUrl: false } });
 let revision = 0;
@@ -140,7 +146,7 @@ function workspaceMessage(message: string, retry: () => void): void {
 }
 
 app.innerHTML = `<main class="auth-page"><p role="status">Ստուգում ենք մուտքը…</p></main>`;
-client.auth.onAuthStateChange((_event, session) => {
+if (!target) client.auth.onAuthStateChange((_event, session) => {
   const ticket = ++revision;
   if (!session) { login(); return; }
   // Supabase callbacks run under an auth lock; check the user after it is released.

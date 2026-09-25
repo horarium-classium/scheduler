@@ -49,3 +49,11 @@ The requested existing Auth account was deleted and a fresh invitation sent to t
 ## Publication migration (local implementation)
 
 `202609240001_publication.sql` was applied to this hosted project on 2026-09-24. The remote migration history matches the repository and linked database lint reports no schema errors. It adds class publishing, immutable revisions and anonymous latest-publication reads. See `PUBLICATION.md` for the contract and validation limits. Student still uses its existing source.
+
+## Invite flow fix — pending deployment
+
+The activation page handles invite/recovery callbacks with isolated in-memory credentials; it does not replace an existing browser login. Old invitation callbacks landing at the main page are forwarded to `activate.html` before normal authentication. After password setup, use the normal login page (sign out first if another account is already logged in). Missing/expired links require a new invitation; a page refresh clears the transient activation credentials. School membership must be assigned separately.
+
+The hosted configuration now declares `activate.html` as Site URL. This local declaration has NOT been applied remotely. First publish and verify the Teacher Pages build, including activation assets under `/horarium-classium/`; then inspect the linked project's hosted config diff and apply only the intended URL changes. Preserve the default Invite email `{{ .ConfirmationURL }}` template. Do not push the root local Supabase config.
+
+Verify one new Dashboard invitation end to end, an old still-valid root redirect, expired/reused links, recovery, password rejection/network retry, and a browser already signed into a different account. Confirm that an unassigned user sees the membership message. Email rate limiting is separate; avoid repeated invitation sends.

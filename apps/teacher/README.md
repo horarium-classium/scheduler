@@ -116,3 +116,11 @@ Workflow-ի առաջին հաջող remote գործարկումը և հրապա�
 Դասարանները ցույց են տալիս «Դեռ չի հրապարակվել», «Հրապարակված է» կամ «Չհրապարակված փոփոխություններ»։ Կարգավիճակի հուշումը ցույց է տալիս վերջին revision-ը և ժամանակը։ Գույնը, ուսուցիչն ու մեկնաբանությունը նույնպես մասնակցում են փոփոխության հաշվարկին, բայց Student-ի հանրային payload-ում չեն հայտնվում։ Հին backend-ի դեպքում հրապարակումը մնում է անհասանելի։
 
 RPC contract-ը, անանուն ընթերցումն ու ստուգումները՝ [PUBLICATION.md](../../supabase/PUBLICATION.md)։ Հանրային API-ն առկա է, Student-ի Gist աղբյուրի փոխարինումը հաջորդ փուլն է։
+
+## Invite flow fix — pending deployment
+
+The activation page handles invite/recovery callbacks with isolated in-memory credentials; it does not replace an existing browser login. Old invitation callbacks landing at the main page are forwarded to `activate.html` before normal authentication. After password setup, use the normal login page (sign out first if another account is already logged in). Missing/expired links require a new invitation; a page refresh clears the transient activation credentials. School membership must be assigned separately.
+
+The hosted configuration now declares `activate.html` as Site URL. This local declaration has NOT been applied remotely. First publish and verify the Teacher Pages build, including activation assets under `/horarium-classium/`; then inspect the linked project's hosted config diff and apply only the intended URL changes. Preserve the default Invite email `{{ .ConfirmationURL }}` template. Do not push the root local Supabase config.
+
+Verify one new Dashboard invitation end to end, an old still-valid root redirect, expired/reused links, recovery, password rejection/network retry, and a browser already signed into a different account. Confirm that an unassigned user sees the membership message. Email rate limiting is separate; avoid repeated invitation sends.
