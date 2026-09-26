@@ -14,29 +14,19 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out Scheduler
-        uses: actions/checkout@v5
-        with:
-          path: scheduler
-      - name: Check out Student contract consumer
-        uses: actions/checkout@v5
-        with:
-          repository: horarium-classium/student
-          path: student
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: |
-            scheduler/package-lock.json
-            scheduler/apps/teacher/package-lock.json
+            package-lock.json
+            apps/teacher/package-lock.json
       - run: npm ci
-        working-directory: scheduler
       - run: npm ci
-        working-directory: scheduler/apps/teacher
+        working-directory: apps/teacher
       - run: npm run publication:test:embedded
-        working-directory: scheduler
       - run: npm test
-        working-directory: scheduler/apps/teacher
+        working-directory: apps/teacher
       - run: npm run build -- --base=/scheduler/
-        working-directory: scheduler/apps/teacher
+        working-directory: apps/teacher

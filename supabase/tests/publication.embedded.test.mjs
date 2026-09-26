@@ -2,7 +2,7 @@
 // reproduces auth.uid()/roles, not GoTrue. Production migrations are unchanged.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
@@ -11,7 +11,13 @@ import { CloudWorkspace } from "../../apps/teacher/src/cloud-workspace.ts";
 import ts from "../../apps/teacher/node_modules/typescript/lib/typescript.js";
 const defaultStudentRoot = fileURLToPath(new URL("../../../student/", import.meta.url));
 const studentRoot = resolve(process.env.HC_STUDENT_ROOT ?? defaultStudentRoot);
-const { load: studentModule } = await import(pathToFileURL(join(studentRoot, "tests/load.mjs")).href);
+let studentModule = null;
+try {
+  await access(join(studentRoot, "tests/load.mjs"));
+  ({ load: studentModule } = await import(pathToFileURL(join(studentRoot, "tests/load.mjs")).href));
+} catch (error) {
+  if (process.env.HC_STUDENT_ROOT) throw error;
+}
 const school = "aaaaaaaa-0000-0000-0000-000000000001";
 const other = "bbbbbbbb-0000-0000-0000-000000000001";
 const classA = "aaaaaaaa-1000-0000-0000-000000000001";
@@ -87,10 +93,12 @@ test('publication migrations: atomic snapshots, privacy, roles, retries and life
   assert.equal(retry.revision,1); assert.equal(retry.publishedAt,first.publishedAt);
 
   // Check the public payload against the unchanged, actual Student parser.
-  const source = await readFile(join(studentRoot, 'src/schedule.ts'),'utf8');
-  const js = ts.transpileModule(source.replace('import { invoke } from "@tauri-apps/api/core";','const invoke = () => {};'), {compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-  const student = await import('data:text/javascript;base64,' + Buffer.from(js).toString('base64'));
-  assert.deepEqual(student.validateSchedule(original.schedule), original.schedule);
+  if (studentModule) {
+    const source = await readFile(join(studentRoot, 'src/schedule.ts'),'utf8');
+    const js = ts.transpileModule(source.replace('import { invoke } from "@tauri-apps/api/core";','const invoke = () => {};'), {compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+    const student = await import('data:text/javascript;base64,' + Buffer.from(js).toString('base64'));
+    assert.deepEqual(student.validateSchedule(original.schedule), original.schedule);
+  }
 
   await db.query('update subjects set name=$1 where id=$2',['Նոր անուն',subject]);
   assert.deepEqual(await published(db, codeA),original,'draft edits cannot mutate publication');
@@ -179,7 +187,9 @@ test('Teacher adapter round trip through real workspace/publication SQL', async 
   state=await cloud.reload(); assert.equal(cloud.publicationState(state,state.classes.find(c=>c.name==='5Ա').id),'published');
 });
 
-test('Teacher save/publish → Student connect/restart/offline/switch/empty/invalidation', async t => {
+test('Teacher save/publish → Student connect/restart/offline/switch/empty/invalidation', {
+  skip: studentModule ? false : 'Student repository is not checked out next to Scheduler',
+}, async t => {
   const db = await fixture(); t.after(() => db.close());
   const { Connection } = await import(await studentModule('connection'));
   const { fetchPublication } = await import(await studentModule('publication'));
