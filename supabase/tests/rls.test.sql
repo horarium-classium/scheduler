@@ -7,10 +7,16 @@ insert into public.schedule_publications(id,school_id,class_id,revision,format_v
 ('aaaaaaaa-6000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000001','aaaaaaaa-1000-0000-0000-000000000001',1,1,'{}'),
 ('bbbbbbbb-6000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000001','bbbbbbbb-1000-0000-0000-000000000001',1,1,'{}');
 
+-- Snapshot expected IDs before RLS, allowing extra local development classes
+-- while still checking the complete visible set (including cross-school leakage).
+select set_config('test.expected_class_ids',
+  (select coalesce(jsonb_agg(id order by id), '[]'::jsonb)::text from classes
+   where school_id='aaaaaaaa-0000-0000-0000-000000000001'), true);
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
 select is((select count(*)::integer from schools), 1, 'admin sees only own school');
-select is((select count(*)::integer from classes), 2, 'admin does not see other school classes');
+select is((select coalesce(jsonb_agg(id order by id), '[]'::jsonb)::text from classes), current_setting('test.expected_class_ids'), 'admin sees every own-school class and no other school classes');
 select is((select count(*)::integer from school_members), 2, 'admin sees all own school members');
 select is((select count(*)::integer from schedule_publications), 1, 'admin reads only own school publications');
 select lives_ok($$update schools set name='Փորձնական դպրոց Ա նոր' where id='aaaaaaaa-0000-0000-0000-000000000001'$$, 'admin updates own school');

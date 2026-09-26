@@ -1,4 +1,5 @@
 import "./style.css";
+import { copyClassCode } from "./class-code";
 import { findLessonConflict, hasDuplicateTeacherName, isSubjectUsed, isTeacherUsed, isTimeSlotUsed, removeClassDraft, sortTimeSlots, validateSubjectName, validateTeacherName, validateTimeSlot, type SchoolClass, type Subject, type Teacher, type TimeSlot } from "./model";
 import { isValidTimezone, type TeacherState } from "./state";
 import { CloudWorkspace, SaveQueue, cloudError } from "./cloud-workspace";
@@ -37,9 +38,12 @@ interface SlotEditorState {
 const SCHOOL_ID = 1;
 const palette = ["#dbeafe", "#dcfce7", "#fef3c7", "#fce7f3", "#ede9fe", "#ffedd5"];
 const weekdays: Weekday[] = [
-  { id: 1, name: "Երկուշաբթի", shortName: "Երկ" }, { id: 2, name: "Երեքշաբթի", shortName: "Երք" },
-  { id: 3, name: "Չորեքշաբթի", shortName: "Չրք" }, { id: 4, name: "Հինգշաբթի", shortName: "Հնգ" },
-  { id: 5, name: "Ուրբաթ", shortName: "Ուրբ" }, { id: 6, name: "Շաբաթ", shortName: "Շբ" },
+  { id: 1, name: "Երկուշաբթի", shortName: "Երկ" }, 
+  { id: 2, name: "Երեքշաբթի", shortName: "Երք" },
+  { id: 3, name: "Չորեքշաբթի", shortName: "Չրք" }, 
+  { id: 4, name: "Հինգշաբթի", shortName: "Հնգ" },
+  { id: 5, name: "Ուրբաթ", shortName: "Ուրբ" }, 
+  { id: 6, name: "Շաբաթ", shortName: "Շբ" },
 ];
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -52,7 +56,8 @@ function nextId(items: ReadonlyArray<{ id: number }>): number {
 let disposed = false;
 let publishing = false;
 let publicationMessage = "";
-const syncBar = document.createElement("section"); syncBar.className = "cloud-sync-bar";
+const syncBar = document.createElement("section"); 
+syncBar.className = "cloud-sync-bar";
 syncBar.innerHTML = `<span role="status"></span><button class="secondary-button retry-save" type="button" hidden>Կրկին փորձել</button><button class="secondary-button reload-cloud" type="button">Բեռնել սերվերից</button><button class="secondary-button download-draft" type="button">Ներբեռնել սևագիրը</button>`;
 app?.before(syncBar);
 const queue = new SaveQueue(value => workspace.save(value), updateSyncStatus);
@@ -164,10 +169,19 @@ function statusMarkup(): string {
 }
 
 function renderToolbar(title: string, preview = false): string {
-  return `<header class="workspace-toolbar"><div class="school-heading"><strong id="school-name"></strong><span>${title}</span></div>${statusMarkup()}<div class="toolbar-actions"><button id="settings-button" class="secondary-button" type="button">Կարգավորումներ</button>${preview ? `<button id="back-to-editor" class="secondary-button" type="button">Վերադառնալ խմբագրիչ</button>` : `<button id="preview-button" class="secondary-button" type="button" ${selectedClass() ? "" : "disabled"}>Նախադիտում</button>`}<button class="publish-button" type="button" disabled title="Հրապարակման backend-ը դեռ միացված չէ">Հրապարակել</button></div></header>`;
+  return `<header class="workspace-toolbar"><div class="school-heading"><strong id="school-name"></strong><span>${title}</span></div>${statusMarkup()}<div class="toolbar-actions"><button id="settings-button" class="secondary-button" type="button">Կարգավորումներ</button>${preview ? `<button id="back-to-editor" class="secondary-button" type="button">Վերադառնալ խմբագրիչ</button>` : `<button id="preview-button" class="secondary-button" type="button" ${selectedClass() ? "" : "disabled"}>Նախադիտում</button>`}<button class="copy-class-code secondary-button" type="button">Պատճենել դասարանի կոդը</button><button class="publish-button" type="button" disabled title="Հրապարակման backend-ը դեռ միացված չէ">Հրապարակել</button></div></header>`;
 }
 
 function wireToolbar(): void {
+  document.querySelector(".copy-class-code")?.addEventListener("click", async () => {
+    const active = selectedClass();
+    if (!active) return;
+    const message = await copyClassCode(workspace.publication(active.id), text => navigator.clipboard.writeText(text));
+    if (disposed || selectedClass()?.id !== active.id) return;
+    publicationMessage = message;
+    const notices = document.querySelector("#notices");
+    if (notices) { notices.replaceChildren(); renderNotices(notices); }
+  });
   document.querySelector(".publish-button")?.addEventListener("click", () => void publishSelectedClass());
   updatePublicationStatus();
   const schoolName = document.querySelector("#school-name"); if (schoolName) schoolName.textContent = state.school.name;

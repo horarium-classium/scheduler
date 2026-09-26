@@ -2,9 +2,15 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select plan(16);
+-- Snapshot expected IDs before RLS, allowing extra local development classes
+-- while still checking the complete visible set (including cross-school leakage).
+select set_config('test.expected_class_ids',
+  (select coalesce(jsonb_agg(id order by id), '[]'::jsonb)::text from classes
+   where school_id='aaaaaaaa-0000-0000-0000-000000000001'), true);
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
-select is(jsonb_array_length(teacher_workspace_read('aaaaaaaa-0000-0000-0000-000000000001')->'data'->'classes'), 2, 'reads the complete own-school snapshot');
+select is((select coalesce(jsonb_agg(entry->>'id' order by entry->>'id'), '[]'::jsonb)::text from jsonb_array_elements(teacher_workspace_read('aaaaaaaa-0000-0000-0000-000000000001')->'data'->'classes') entry), current_setting('test.expected_class_ids'), 'reads the complete own-school snapshot');
 select is(teacher_workspace_read('bbbbbbbb-0000-0000-0000-000000000001'), null::jsonb, 'cannot read another school');
 select set_config('test.workspace_version', teacher_workspace_read('aaaaaaaa-0000-0000-0000-000000000001')->>'version', true);
 select lives_ok($$select teacher_workspace_save('aaaaaaaa-0000-0000-0000-000000000001',current_setting('test.workspace_version'),'[{"table":"classes","op":"insert","row":{"id":"aaaaaaaa-1000-0000-0000-000000000099","name":"9Ա","sort_order":3}}]')$$, 'admin saves a new class');

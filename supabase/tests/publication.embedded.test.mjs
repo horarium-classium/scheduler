@@ -7,6 +7,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import { CloudWorkspace } from "../../apps/teacher/src/cloud-workspace.ts";
 import ts from "../../apps/teacher/node_modules/typescript/lib/typescript.js";
+import { load as studentModule } from "../../apps/student/tests/load.mjs";
 const school = "aaaaaaaa-0000-0000-0000-000000000001";
 const other = "bbbbbbbb-0000-0000-0000-000000000001";
 const classA = "aaaaaaaa-1000-0000-0000-000000000001";
@@ -167,4 +168,58 @@ test('Teacher adapter round trip through real workspace/publication SQL', async 
   state.school.name='Forbidden scheduler edit';
   await assert.rejects(cloud.save(state),e=>e.code==='42501');
   state=await cloud.reload(); assert.equal(cloud.publicationState(state,state.classes.find(c=>c.name==='5Ա').id),'published');
+});
+
+test('Teacher save/publish → Student connect/restart/offline/switch/empty/invalidation', async t => {
+  const db = await fixture(); t.after(() => db.close());
+  const { Connection } = await import(await studentModule('connection'));
+  const { fetchPublication } = await import(await studentModule('publication'));
+  await as(db, 'authenticated', admin);
+  const cloud = new CloudWorkspace(school, await read(db), {
+    read: () => read(db),
+    save: (version, changes) => scalar(db, 'select teacher_workspace_save($1,$2,$3::jsonb) as value', [school, version, JSON.stringify(changes)]),
+    publish: (classId, version) => publish(db, classId, version),
+  });
+  const state = cloud.decode();
+  const a = state.classes.find(c => c.name === '5Ա').id;
+  const b = state.classes.find(c => c.id !== a).id;
+  await cloud.publish(a, state);
+  let saved = null, token = 0, offline = false;
+  const views = [];
+  const storage = { read: async () => structuredClone(saved), begin: async () => ++token,
+    commit: async (current, record, cached) => { assert.equal(current, token); if (!cached) saved = structuredClone(record); } };
+  const config = { environment: 'http://127.0.0.1:54321', key: 'sb_publishable_fixture' };
+  const fetcher = (config, id) => fetchPublication(config, id, async (_url, init) => {
+    if (offline) throw new Error('offline');
+    await as(db, 'anon');
+    return Response.json(await scalar(db, 'select get_published_schedule($1) as value', [JSON.parse(init.body).p_public_id]));
+  });
+  const student = () => new Connection(config, storage, view => views.push(view), fetcher);
+  const first = student(); assert.equal(await first.restore(), false);
+  const code = cloud.publication(a).public_id;
+  await first.preview(code); await first.confirm();
+  assert.equal(views.at(-1).publication.schedule['Երկուշաբթի'][0].lesson, 'Մաթեմատիկա');
+  offline = true;
+  const restarted = student(); await restarted.restore(); await restarted.refresh();
+  assert.equal(views.at(-1).source, 'cached');
+  await as(db, 'authenticated', admin);
+  state.subjects.find(s => s.name === 'Մաթեմատիկա').name = 'Նոր առարկա';
+  await cloud.save(state); await cloud.publish(a, state);
+  offline = false;
+  const updated = student(); await updated.restore(); await updated.refresh();
+  assert.equal(views.at(-1).publication.revision, 2);
+  assert.equal(views.at(-1).publication.schedule['Երկուշաբթի'][0].lesson, 'Նոր առարկա');
+  await as(db, 'authenticated', admin); await cloud.publish(b, state);
+  await updated.preview(cloud.publication(b).public_id); await updated.confirm();
+  assert.equal(saved.publicId, cloud.publication(b).public_id);
+  assert.ok(Object.values(saved.publication.schedule).every(day => !day.length));
+  await updated.preview(code); await updated.confirm();
+  await as(db, 'authenticated', admin);
+  state.lessons = state.lessons.filter(lesson => lesson.classId !== a);
+  await cloud.save(state); await cloud.publish(a, state);
+  await updated.refresh(); assert.ok(Object.values(saved.publication.schedule).every(day => !day.length));
+  await as(db, 'authenticated', admin); await db.query('update classes set active=false where id=$1', [classA]);
+  await updated.refresh(); assert.equal(saved.publication, null);
+  offline = true;
+  const unavailable = student(); await unavailable.restore(); await assert.rejects(unavailable.refresh());
 });
