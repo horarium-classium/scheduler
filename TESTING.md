@@ -31,7 +31,7 @@ TypeScript թեստերը ծածկում են validation/cache/timeout, current-
 Ստորևի քայլերը կրկնել **յուրաքանչյուր OS-ում** և արդյունքը գրանցել տվյալ հարթակի բաժնում։ Օգտագործեք միայն մեկուսացված տեղային Supabase դպրոց և առանձին OS փորձնական օգտատեր։ Ամբողջ շղթայի քայլերը՝ [PUBLICATION.md](supabase/PUBLICATION.md#teacher--student-տեղային-փորձարկում)։ Հին Gist cache-ը fallback չէ։
 
 - [ ] Առաջին մեկնարկը տեսանելի է, իսկ հաստատված կապով հաջորդը՝ թաքնված tray-ում։ Բացակայող build environment-ը ցույց է տալիս հայերեն սխալ։
-- [ ] UUID-ի ստուգում → դպրոցի/դասարանի անուններ → «Միանալ»։ Պահման ձախողումը հաջողություն չէ։
+- [ ] 4 տառանոց կոդի ստուգում → դպրոցի/դասարանի անուններ → «Միանալ»։ Պահման ձախողումը հաջողություն չէ։
 - [ ] Դասարանի փոփոխության սխալ կոդը/Չեղարկելը պահպանում են նախկին կապը։ Հաջող փոխումից հետո հին notification/զանգ/սպասող խոսք չկա։
 - [ ] Local/hosted և երկու դասարանների cache-երը մեկուսացված են։ `schedule-v1.json`-ը չի ներմուծվում և չի ջնջվում։
 - [ ] `null`-ը մաքրում է հիշեցումները նաև հաջորդ offline restart-ի համար։ Դատարկ հրապարակումը փոխարինում է նախորդ cache-ը։
@@ -166,3 +166,12 @@ Release-ից առաջ երեք OS-ի վերևի ցուցակներում առա�
 - `npm run supabase:lint`՝ schema errors չկան։ Reset, hosted փոփոխություն կամ նոր migration չի կատարվել։
 
 Կրկնելու համար պետք են գործող local stack-ը, կիրառված migrations-ը և root/Teacher/Student dependencies-ը։ Հրամանը գործարկեք repository root-ից՝ առանց զուգահեռ տվյալների խմբագրման, որպեսզի fingerprint-ի համեմատությունը իմաստալից լինի։
+
+- [ ] UUID տարբերակից թարմացում՝ հին `publication-v2.json`/invalidation ֆայլերը պահպանվում են, նոր կոդով միացումը և offline վերամեկնարկն աշխատում են `publication-v3.json`-ով։
+
+## Join-code review fixes — 2026-09-26
+
+- macOS x86_64 / Node 22.17.1՝ Teacher 30 և Student 15 թեստ, երկու production build։ Rust՝ 26 library test և `cargo check --locked`։ Windows/Linux և native UI/tray/audio ձեռքով չեն ստուգվել այս փուլում։
+- Embedded PostgreSQL՝ 5 թեստ, ներառյալ արդեն լցված բազայի forward migration, անփոփոխ publication/draft, UUID compatibility, կոդերի կայունություն և collision retry։
+- Տեղային PostgreSQL՝ 139 pgTAP ստուգում առանձին ժամանակավոր բազայում, ներառյալ իրական երկու միացումով նույն կոդի բախումը։ Գործող տեղային բազայի seed-ը խմբագրված է, ուստի ամբողջ suite-ն այնտեղ baseline-ի սխալներ է տալիս․ այն չի reset արվել։
+- Գործող տեղային բազայի lint-ը և մեկուսացված HTTP integration-ը անցել են, առկա public տվյալների fingerprint-ը չի փոխվել։

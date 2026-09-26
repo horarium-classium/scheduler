@@ -3,7 +3,7 @@ import { SCHEMA_VERSION, validateState, type TeacherState } from "./state.ts";
 export const tables = ["classes", "time_slots", "subjects", "teachers", "lessons"] as const;
 type Table = typeof tables[number];
 type Row = Record<string, unknown> & { id: string };
-export interface PublicationStatus { class_id: string; public_id: string; revision: number | null; published_at: string | null; is_current: boolean; }
+export interface PublicationStatus { class_id: string; public_id: string; join_code?: string; revision: number | null; published_at: string | null; is_current: boolean; }
 export interface WorkspaceSnapshot { version: string; data: { school: Row } & Record<Table, Row[]>; publications?: PublicationStatus[]; }
 export type PublicationState = "unavailable" | "unpublished" | "published" | "changed";
 
@@ -32,6 +32,7 @@ const fields: Record<Table, string[]> = {
   lessons: ["class_id", "weekday", "time_slot_id", "subject_id", "teacher_id", "comment"],
 };
 function record(value: unknown): value is Record<string, unknown> { return !!value && typeof value === "object" && !Array.isArray(value); }
+const joinCodePattern = /^[A-HJ-NP-RT-Z]{4}$/;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function parseSnapshot(value: unknown, schoolId: string): WorkspaceSnapshot {
   if (!record(value) || typeof value.version !== "string" || !record(value.data) || !record(value.data.school) || value.data.school.id !== schoolId) throw new Error("Դպրոցի տվյալները հասանելի չեն։");
@@ -44,6 +45,12 @@ export function parseSnapshot(value: unknown, schoolId: string): WorkspaceSnapsh
       ids.add(row.id);
     }
   }
+  const codes = new Set<string>();
+  for (const row of value.data.classes as Row[]) {
+    if (row.join_code === undefined) continue; // Older workspace responses.
+    if (typeof row.join_code !== "string" || !joinCodePattern.test(row.join_code) || codes.has(row.join_code)) throw new Error("Դասարանի կոդն անվավեր է։");
+    codes.add(row.join_code);
+  }
   if (value.publications !== undefined) {
     const classes = value.data.classes as Row[];
     if (!Array.isArray(value.publications) || value.publications.length !== classes.length) throw new Error("Հրապարակման կարգավիճակներն անվավեր են։");
@@ -51,11 +58,15 @@ export function parseSnapshot(value: unknown, schoolId: string): WorkspaceSnapsh
     for (const item of value.publications) {
       if (!record(item) || typeof item.class_id !== "string" || seen.has(item.class_id) ||
         !classes.some((row: Row) => row.id === item.class_id && row.public_id === item.public_id) ||
-        typeof item.public_id !== "string" || !uuid.test(item.public_id) || typeof item.is_current !== "boolean" ||
+        typeof item.public_id !== "string" || !uuid.test(item.public_id) ||
+        (item.join_code !== undefined && (typeof item.join_code !== "string" || !joinCodePattern.test(item.join_code))) ||
+        typeof item.is_current !== "boolean" ||
         (item.revision === null ? item.published_at !== null || item.is_current :
           !Number.isSafeInteger(item.revision) || Number(item.revision) < 1 || typeof item.published_at !== "string" || !Number.isFinite(Date.parse(item.published_at)))) {
         throw new Error("Հրապարակման կարգավիճակներն անվավեր են։");
       }
+      const row = classes.find(row => row.id === item.class_id)!;
+      if (row.join_code !== undefined && item.join_code !== undefined && row.join_code !== item.join_code) throw new Error("Դասարանի կոդերը չեն համընկնում։");
       seen.add(item.class_id);
     }
   }
@@ -111,6 +122,11 @@ export class CloudWorkspace {
   get publicationAvailable(): boolean { return this.snapshot.publications !== undefined && !!this.transport.publish; }
   publication(classId: number): PublicationStatus | undefined {
     return this.snapshot.publications?.find(p => p.class_id === this.ids.classes.get(classId));
+  }
+  joinCode(classId: number): string | undefined {
+    const remoteId = this.ids.classes.get(classId);
+    const row = this.snapshot.data.classes.find(item => item.id === remoteId);
+    return typeof row?.join_code === "string" ? row.join_code : this.publication(classId)?.join_code;
   }
   publicationState(state: TeacherState, classId: number): PublicationState {
     if (!this.publicationAvailable) return "unavailable";

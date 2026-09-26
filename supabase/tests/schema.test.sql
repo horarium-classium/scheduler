@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(18);
+select plan(20);
 
 select has_table('public', 'schools', 'schools table exists');
 select has_table('public', 'profiles', 'profiles table exists');
@@ -18,6 +18,8 @@ select col_type_is('public', 'time_slots', 'start_time', 'time without time zone
 select col_is_pk('public', 'profiles', 'id', 'profile id is its primary key');
 select col_is_fk('public', 'profiles', 'id', 'profile id references auth user');
 select col_has_default('public', 'classes', 'public_id', 'class public id has generated default');
+select col_type_is('public', 'classes', 'join_code', 'text', 'class join code is text');
+select has_trigger('public', 'classes', 'classes_assign_join_code', 'class join code is atomically allocated by trigger');
 select has_index('public', 'lessons', 'lessons_cell_key', 'one-cell unique constraint has an index');
 select has_index('public', 'lessons', 'lessons_teacher_slot_key', 'teacher occupancy partial unique index exists');
 select is((select count(*)::integer from pg_catalog.pg_tables where schemaname = 'public' and rowsecurity), 9, 'RLS is enabled on all browser-facing tables');

@@ -24,7 +24,7 @@ function sql(statement) {
   if (result.status !== 0) throw new Error('Local fixture SQL failed');
   return result.stdout.trim();
 }
-assert.equal(sql("select to_regprocedure('public.get_published_schedule(uuid)') is not null;"), 't', 'Apply local publication migrations first');
+assert.equal(sql("select to_regprocedure('public.get_published_schedule(text)') is not null;"), 't', 'Apply local publication migrations first');
 const tables = ['profiles', 'schools', 'school_members', 'classes', 'time_slots', 'subjects', 'teachers', 'lessons', 'schedule_publications'];
 function fingerprint() {
   return sql(`select md5(string_agg(value, '' order by value)) from (${tables.map(table => `select '${table}:' || to_jsonb(t)::text as value from public.${table} t`).join(' union all ')}) records;`);
@@ -36,7 +36,7 @@ const password = randomUUID() + randomUUID();
 const admin = createClient(config.API_URL, config.SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const teacher = createClient(config.API_URL, config.ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const directory = await mkdtemp(join(tmpdir(), 'horarium-publication-local-'));
-const cachePath = join(directory, 'publication-v2.json');
+const cachePath = join(directory, 'publication-v3.json');
 let userId, stage = 'create fixture';
 try {
   const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
@@ -68,8 +68,8 @@ try {
   state.lastSelectedClassId = 1;
   stage = 'Teacher save and publication';
   await cloud.save(state); await cloud.publish(1, state);
-  const codeA = cloud.publication(1).public_id;
-  const codeB = cloud.publication(2).public_id;
+  const codeA = cloud.joinCode(1);
+  const codeB = cloud.joinCode(2);
   const { Connection } = await import(await load('connection'));
   const { fetchPublication, validateCache } = await import(await load('publication'));
   const { schoolTime } = await import(await load('school-time'));
@@ -106,19 +106,19 @@ try {
   offline = false; connection = student(); await connection.restore(); await connection.refresh();
   assert.equal(lastView.publication.revision, 2); assert.equal(lastView.publication.schedule['Երկուշաբթի'][0].lesson, 'Նոր առարկա');
   await assert.rejects(connection.preview('not-a-uuid'));
-  assert.equal(connection.selection.publicId, codeA);
+  assert.equal(connection.selection.joinCode, codeA);
   await assert.rejects(connection.preview(codeB)); // Not published yet.
-  assert.equal(connection.selection.publicId, codeA);
+  assert.equal(connection.selection.joinCode, codeA);
   await cloud.publish(2, state);
   await connection.preview(codeB); await connection.confirm();
-  assert.equal(connection.selection.publicId, codeB);
+  assert.equal(connection.selection.joinCode, codeB);
   assert.ok(Object.values(lastView.publication.schedule).every(day => day.length === 0));
   await connection.preview(codeA); await connection.confirm();
   stage = 'empty publication and persistent unavailable state';
   state.lessons = []; await cloud.save(state); await cloud.publish(1, state);
   await connection.refresh(); assert.equal(lastView.publication.revision, 3);
   assert.ok(Object.values(lastView.publication.schedule).every(day => day.length === 0));
-  const archive = await teacher.from('classes').update({ active: false }).eq('school_id', school).eq('public_id', codeA);
+  const archive = await teacher.from('classes').update({ active: false }).eq('school_id', school).eq('join_code', codeA);
   if (archive.error) throw new Error('Local archive failed');
   await connection.refresh(); assert.equal(lastView.publication, null);
   offline = true; connection = student(); await connection.restore();
@@ -127,7 +127,7 @@ try {
   const anon = createClient(config.API_URL, config.ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const draft = await anon.rpc('teacher_workspace_read', { p_school: school });
   assert.ok(draft.error, 'Anonymous access to drafts must fail');
-  console.log('PASS: real local Auth/PostgREST, Teacher save/publish, Student UUID confirmation, timezone, offline restart, revision refresh, class switch, empty publication, persistent null and anonymous privacy.');
+  console.log('PASS: real local Auth/PostgREST, Teacher save/publish, Student join-code confirmation, timezone, offline restart, revision refresh, class switch, empty publication, persistent null and anonymous privacy.');
 } catch {
   throw new Error(`Local publication integration failed at: ${stage}. Credentials omitted.`);
 } finally {
@@ -135,6 +135,7 @@ try {
   sql(`begin;
     delete from public.schedule_publications where school_id='${school}';
     delete from public.lessons where school_id='${school}';
+    delete from private.class_join_codes where class_id in (select id from public.classes where school_id='${school}');
     delete from public.classes where school_id='${school}';
     delete from public.time_slots where school_id='${school}';
     delete from public.subjects where school_id='${school}';

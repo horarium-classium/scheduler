@@ -18,7 +18,7 @@ const scheduler = "10000000-0000-0000-0000-000000000002";
 const subject = "aaaaaaaa-3000-0000-0000-000000000001";
 const slot = "aaaaaaaa-2000-0000-0000-000000000001";
 
-async function fixture() {
+async function fixture(skipCorrection = false) {
   const db = new PGlite({ extensions: { btree_gist } });
   await db.exec(`create schema extensions; create schema auth;
     create role anon; create role authenticated;
@@ -29,6 +29,7 @@ async function fixture() {
     insert into auth.users(id) values ('${admin}'), ('${scheduler}'),
       ('10000000-0000-0000-0000-000000000003'), ('10000000-0000-0000-0000-000000000004');`);
   for (const file of (await readdir(new URL('../migrations/', import.meta.url))).filter(f => f.endsWith('.sql')).sort()) {
+    if (skipCorrection && file.startsWith('202609260004')) continue;
     const sql = await readFile(new URL('../migrations/' + file, import.meta.url), 'utf8');
     // pgcrypto is used only by seed password hashing. No publication function
     // depends on it; gen_random_uuid() is built into PostgreSQL.
@@ -45,7 +46,7 @@ async function as(db, role, user = '') {
 }
 async function scalar(db, sql, params = []) { return (await db.query(sql, params)).rows[0].value; }
 const read = db => scalar(db, 'select teacher_workspace_read($1) as value', [school]);
-const published = db => scalar(db, 'select get_published_schedule($1) as value', [publicA]);
+const published = (db, code) => scalar(db, 'select get_published_schedule($1) as value', [code]);
 async function publish(db, classId = classA, version) {
   version ??= (await read(db)).version;
   return scalar(db, 'select publish_schedule($1,$2,$3) as value', [school,classId,version]);
@@ -57,7 +58,10 @@ async function rejected(db, sql, params, code) {
 test('publication migrations: atomic snapshots, privacy, roles, retries and lifecycle', async t => {
   const db = await fixture(); t.after(() => db.close());
   await as(db,'authenticated',admin);
-  assert.equal(await published(db), null);
+  const codeA = await scalar(db, 'select join_code as value from classes where id=$1', [classA]);
+  const codeB = await scalar(db, 'select join_code as value from classes where id=$1', [classB]);
+  assert.match(codeA, /^[A-HJ-NP-RT-Z]{4}$/);
+  assert.equal(await published(db, codeA), null);
   assert.equal((await read(db)).publications[0].revision, null);
   const before = (await read(db)).version;
   const first = await publish(db);
@@ -65,14 +69,15 @@ test('publication migrations: atomic snapshots, privacy, roles, retries and life
   assert.equal(first.workspace.version,before, 'publishing does not stale a draft save');
   assert.equal(first.workspace.publications.find(p => p.class_id === classA).is_current,true);
   assert.equal(first.workspace.publications.find(p => p.class_id === classB).revision,null);
-  const original = await published(db);
-  assert.equal(original.formatVersion,1);
+  const original = await published(db, codeA);
+  assert.equal(original.formatVersion,2);
   assert.equal(original.timezone,'Asia/Yerevan');
   assert.equal(original.className,'5Ա');
   assert.equal(Object.keys(original.schedule).length,7);
   assert.deepEqual(original.schedule['Երկուշաբթի'],[{start:'09:00',end:'09:45',lesson:'Մաթեմատիկա'}]);
   assert.deepEqual(original.schedule['Կիրակի'],[]);
-  assert.deepEqual(Object.keys(original).sort(),['className','formatVersion','publicId','publishedAt','revision','schedule','schoolName','timezone'].sort());
+  assert.deepEqual(Object.keys(original).sort(),['className','formatVersion','joinCode','publishedAt','revision','schedule','schoolName','timezone'].sort());
+  assert.equal(original.joinCode, codeA);
   assert.equal((await scalar(db,'select published_by as value from schedule_publications where class_id=$1',[classA])),admin);
   const retry = await publish(db);
   assert.equal(retry.revision,1); assert.equal(retry.publishedAt,first.publishedAt);
@@ -84,13 +89,13 @@ test('publication migrations: atomic snapshots, privacy, roles, retries and life
   assert.deepEqual(student.validateSchedule(original.schedule), original.schedule);
 
   await db.query('update subjects set name=$1 where id=$2',['Նոր անուն',subject]);
-  assert.deepEqual(await published(db),original,'draft edits cannot mutate publication');
+  assert.deepEqual(await published(db, codeA),original,'draft edits cannot mutate publication');
   assert.equal((await read(db)).publications.find(p=>p.class_id===classA).is_current,false);
   await rejected(db,'select publish_schedule($1,$2,$3)',[school,classA,before],'40001');
-  assert.deepEqual(await published(db),original,'stale publish preserves previous output');
+  assert.deepEqual(await published(db, codeA),original,'stale publish preserves previous output');
   await as(db,'authenticated',scheduler);
   assert.equal((await publish(db)).revision,2,'scheduler can publish');
-  assert.equal((await published(db)).schedule['Երկուշաբթի'][0].lesson,'Նոր անուն');
+  assert.equal((await published(db, codeA)).schedule['Երկուշաբթի'][0].lesson,'Նոր անուն');
   assert.equal(await scalar(db,'select count(*)::int as value from schedule_publications where class_id=$1',[classA]),2);
   assert.equal(await scalar(db,"select payload->'schedule'->'Երկուշաբթի'->0->>'lesson' as value from schedule_publications where class_id=$1 and revision=1",[classA]),'Մաթեմատիկա');
   await rejected(db,"insert into schedule_publications(school_id,class_id,revision,format_version,payload) values ($1,$2,99,1,'{}')",[school,classA],'42501');
@@ -99,28 +104,28 @@ test('publication migrations: atomic snapshots, privacy, roles, retries and life
   await rejected(db,'select publish_schedule($1,$2,$3)',[other,classA,before],'42501');
   await rejected(db,'select publish_schedule($1,$2,$3)',[school,'bbbbbbbb-1000-0000-0000-000000000001',(await read(db)).version],'22023');
 
-  const second=await published(db);
+  const second=await published(db, codeA);
   await db.query('update subjects set active=false where id=$1',[subject]);
   assert.equal((await read(db)).publications.find(p=>p.class_id===classA).is_current,false);
   await rejected(db,'select publish_schedule($1,$2,$3)',[school,classA,(await read(db)).version],'23514');
-  assert.deepEqual(await published(db),second,'invalid links cannot replace public snapshot');
+  assert.deepEqual(await published(db, codeA),second,'invalid links cannot replace public snapshot');
   await db.query('update subjects set active=true where id=$1',[subject]);
   await as(db,'authenticated',admin);
   await db.query("update time_slots set start_time='08:30',end_time='09:15' where id=$1",[slot]);
   assert.equal((await read(db)).publications.find(p=>p.class_id===classA).is_current,false);
-  assert.equal((await published(db)).schedule['Երկուշաբթի'][0].start,'09:00');
+  assert.equal((await published(db, codeA)).schedule['Երկուշաբթի'][0].start,'09:00');
   await publish(db);
-  assert.equal((await published(db)).schedule['Երկուշաբթի'][0].start,'08:30');
+  assert.equal((await published(db, codeA)).schedule['Երկուշաբթի'][0].start,'08:30');
   await db.query('update classes set name=$1 where id=$2',['7Ա',classA]);
-  assert.equal((await published(db)).className,'5Ա');
-  await publish(db); assert.equal((await published(db)).className,'7Ա');
+  assert.equal((await published(db, codeA)).className,'5Ա');
+  await publish(db); assert.equal((await published(db, codeA)).className,'7Ա');
   await rejected(db,'delete from classes where id=$1',[classA],['23503','23001']);
 
   await as(db,'authenticated','10000000-0000-0000-0000-000000000004');
   await rejected(db,'select publish_schedule($1,$2,$3)',[school,classA,before],'42501');
   await as(db,'anon');
-  assert.equal((await published(db)).className,'7Ա');
-  assert.equal(await scalar(db,'select get_published_schedule($1) as value',['00000000-0000-0000-0000-000000000000']),null);
+  assert.equal((await published(db, codeA)).className,'7Ա');
+  assert.equal(await scalar(db,'select get_published_schedule($1) as value',['AAAA']),null);
   await rejected(db,'select * from lessons',[],'42501');
   await rejected(db,'select * from schedule_publications',[],'42501');
   await rejected(db,'select teacher_workspace_read($1)',[school],'42501');
@@ -129,17 +134,16 @@ test('publication migrations: atomic snapshots, privacy, roles, retries and life
 
   await as(db,'authenticated',admin);
   const empty=await publish(db,classB); assert.equal(empty.revision,1);
-  const bPublic=(await read(db)).publications.find(p=>p.class_id===classB).public_id;
-  const emptyPayload=await scalar(db,'select get_published_schedule($1) as value',[bPublic]);
+  const emptyPayload=await scalar(db,'select get_published_schedule($1) as value',[codeB]);
   assert.ok(Object.values(emptyPayload.schedule).every(day=>day.length===0));
   await db.query('delete from lessons where class_id=$1',[classA]);
   await rejected(db,'delete from classes where id=$1',[classA],['23503','23001']);
-  assert.equal((await published(db)).schedule['Երկուշաբթի'].length,1);
+  assert.equal((await published(db, codeA)).schedule['Երկուշաբթի'].length,1);
   await publish(db);
-  assert.ok(Object.values((await published(db)).schedule).every(day=>day.length===0),'empty publication clears previous lessons');
-  assert.deepEqual(await scalar(db,'select get_published_schedule($1) as value',[bPublic]),emptyPayload);
+  assert.ok(Object.values((await published(db, codeA)).schedule).every(day=>day.length===0),'empty publication clears previous lessons');
+  assert.deepEqual(await scalar(db,'select get_published_schedule($1) as value',[codeB]),emptyPayload);
   await db.query('update classes set active=false where id=$1',[classA]);
-  assert.equal(await published(db),null,'archived class stops public access');
+  assert.equal(await published(db, codeA),null,'archived class stops public access');
   await rejected(db,'select publish_schedule($1,$2,$3)',[school,classA,(await read(db)).version],'22023');
 });
 
@@ -151,6 +155,7 @@ test('Teacher adapter round trip through real workspace/publication SQL', async 
     publish:(classId,version)=>publish(db,classId,version),
   });
   let state=cloud.decode(); const classId=state.classes.find(c=>c.name==='5Ա').id;
+  const codeA = cloud.joinCode(classId);
   assert.equal(cloud.publicationState(state,classId),'unpublished');
   await cloud.publish(classId,state); assert.equal(cloud.publicationState(state,classId),'published');
   state.subjects.find(s=>s.name==='Մաթեմատիկա').color='#ffffff';
@@ -161,9 +166,9 @@ test('Teacher adapter round trip through real workspace/publication SQL', async 
   state.school.name='Անվանափոխված դպրոց';
   state.school.timezone='Europe/Paris';
   await cloud.save(state); assert.equal(cloud.publicationState(state,classId),'changed');
-  assert.notEqual((await published(db)).schoolName,state.school.name);
-  await cloud.publish(classId,state); assert.equal((await published(db)).schoolName,state.school.name);
-  assert.equal((await published(db)).timezone,'Europe/Paris');
+  assert.notEqual((await published(db, codeA)).schoolName,state.school.name);
+  await cloud.publish(classId,state); assert.equal((await published(db, codeA)).schoolName,state.school.name);
+  assert.equal((await published(db, codeA)).timezone,'Europe/Paris');
   await as(db,'authenticated',scheduler);
   state.school.name='Forbidden scheduler edit';
   await assert.rejects(cloud.save(state),e=>e.code==='42501');
@@ -192,11 +197,11 @@ test('Teacher save/publish → Student connect/restart/offline/switch/empty/inva
   const fetcher = (config, id) => fetchPublication(config, id, async (_url, init) => {
     if (offline) throw new Error('offline');
     await as(db, 'anon');
-    return Response.json(await scalar(db, 'select get_published_schedule($1) as value', [JSON.parse(init.body).p_public_id]));
+    return Response.json(await scalar(db, 'select get_published_schedule($1) as value', [JSON.parse(init.body).p_join_code]));
   });
   const student = () => new Connection(config, storage, view => views.push(view), fetcher);
   const first = student(); assert.equal(await first.restore(), false);
-  const code = cloud.publication(a).public_id;
+  const code = cloud.joinCode(a);
   await first.preview(code); await first.confirm();
   assert.equal(views.at(-1).publication.schedule['Երկուշաբթի'][0].lesson, 'Մաթեմատիկա');
   offline = true;
@@ -210,8 +215,9 @@ test('Teacher save/publish → Student connect/restart/offline/switch/empty/inva
   assert.equal(views.at(-1).publication.revision, 2);
   assert.equal(views.at(-1).publication.schedule['Երկուշաբթի'][0].lesson, 'Նոր առարկա');
   await as(db, 'authenticated', admin); await cloud.publish(b, state);
-  await updated.preview(cloud.publication(b).public_id); await updated.confirm();
-  assert.equal(saved.publicId, cloud.publication(b).public_id);
+  const codeB = cloud.joinCode(b);
+  await updated.preview(codeB); await updated.confirm();
+  assert.equal(saved.joinCode, codeB);
   assert.ok(Object.values(saved.publication.schedule).every(day => !day.length));
   await updated.preview(code); await updated.confirm();
   await as(db, 'authenticated', admin);
@@ -222,4 +228,43 @@ test('Teacher save/publish → Student connect/restart/offline/switch/empty/inva
   await updated.refresh(); assert.equal(saved.publication, null);
   offline = true;
   const unavailable = student(); await unavailable.restore(); await assert.rejects(unavailable.refresh());
+});
+
+test('join codes cannot be reassigned, reused after deletion or reserved by clients', async t => {
+  const db = await fixture(); t.after(() => db.close());
+  await as(db, 'authenticated', admin);
+  const code = await scalar(db, 'select join_code as value from classes where id=$1', [classA]);
+  await publish(db);
+  await rejected(db, "update classes set join_code='ZZZZ' where id=$1", [classA], '23514');
+  assert.equal((await published(db, code)).className, '5Ա');
+  await rejected(db, 'select * from private.class_join_codes', [], '42501');
+  await rejected(db, 'delete from private.class_join_codes', [], '42501');
+  const added = (await db.query('insert into classes(school_id,name) values ($1,$2) returning id,join_code', [school, 'Temporary'])).rows[0];
+  await db.query('delete from classes where id=$1', [added.id]);
+  await rejected(db, 'insert into classes(school_id,name,join_code) values ($1,$2,$3)', [school, 'Replacement', added.join_code], '23505');
+  assert.equal(await published(db, added.join_code), null);
+  // Force the first generated candidate to collide, then prove retry succeeds.
+  await as(db, 'postgres');
+  await db.exec('select setseed(0.42)');
+  const first = (await db.query('insert into classes(school_id,name) values ($1,$2) returning join_code', [school, 'Collision owner'])).rows[0].join_code;
+  await db.exec('select setseed(0.42)');
+  const second = (await db.query('insert into classes(school_id,name) values ($1,$2) returning join_code', [other, 'Collision retry'])).rows[0].join_code;
+  assert.notEqual(first, second);
+});
+
+test('forward join-code migration preserves populated drafts, publications and both RPC formats', async t => {
+  const db = await fixture(true); t.after(() => db.close());
+  await as(db, 'authenticated', admin);
+  await publish(db);
+  const before = await read(db);
+  const code = before.publications.find(p => p.class_id === classA).join_code;
+  const payload = await published(db, code);
+  const uuidPayload = await scalar(db, 'select get_published_schedule($1::uuid) as value', [publicA]);
+  await as(db, 'postgres');
+  await db.exec(await readFile(new URL('../migrations/202609260004_stable_join_code_allocation.sql', import.meta.url), 'utf8'));
+  await as(db, 'authenticated', admin);
+  assert.deepEqual(await read(db), before);
+  assert.deepEqual(await published(db, code), payload);
+  assert.deepEqual(await scalar(db, 'select get_published_schedule($1::uuid) as value', [publicA]), uuidPayload);
+  await rejected(db, 'update classes set join_code=$1 where id=$2', ['ZZZZ', classA], '23514');
 });

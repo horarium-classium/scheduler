@@ -9,10 +9,10 @@ API URL: https://soqjiqvapluubkibzrut.supabase.co
 
 ## Applied and verified
 
-- Four repository migrations applied, including `202609230001_teacher_workspace.sql`, without seed data or test users.
+- Repository migrations through `202609260004_stable_join_code_allocation.sql` applied, including the publication and four-letter class join-code migrations, without seed data or test users.
 - Local/remote migration history matches; remote database lint passed.
 - Auth public signup disabled; site URL is https://armenbadal.github.io/horarium-classium/. Redirects retain the local development URLs and allow https://armenbadal.github.io/horarium-classium/activate.html. Updated 2026-09-23; other hosted Auth settings were left unchanged.
-- Teacher Auth is verified by the user. The cloud data adapter and workspace RPCs are implemented; the frontend changes require publication. No local import, publication RPC or Student integration yet.
+- Teacher Auth is verified by the user. The cloud data adapter and workspace RPCs are implemented; the frontend changes require publication. Publication RPCs and Student integration are implemented; no local-data import was performed.
 
 ## Credentials
 
@@ -48,7 +48,7 @@ The requested existing Auth account was deleted and a fresh invitation sent to t
 
 ## Publication migration (local implementation)
 
-`202609240001_publication.sql` was applied to this hosted project on 2026-09-24. The remote migration history matches the repository and linked database lint reports no schema errors. It adds class publishing, immutable revisions and anonymous latest-publication reads. See `PUBLICATION.md` for the contract and validation limits. Student still uses its existing source.
+`202609240001_publication.sql`, `202609260001_class_join_codes.sql`, `202609260002_publication_uuid_compatibility.sql`, and `202609260003_join_code_generator_lint_fix.sql` are applied to this hosted project. The remote migration history matches the repository and linked database lint reports no schema errors. The publication contract now supports four-letter class join codes while the UUID RPC remains as a compatibility path for older Student builds. See `PUBLICATION.md` for the contract and validation limits.
 
 ## Invite flow fix — pending deployment
 
@@ -57,3 +57,11 @@ The activation page handles invite/recovery callbacks with isolated in-memory cr
 The hosted configuration now declares `activate.html` as Site URL. This local declaration has NOT been applied remotely. First publish and verify the Teacher Pages build, including activation assets under `/horarium-classium/`; then inspect the linked project's hosted config diff and apply only the intended URL changes. Preserve the default Invite email `{{ .ConfirmationURL }}` template. Do not push the root local Supabase config.
 
 Verify one new Dashboard invitation end to end, an old still-valid root redirect, expired/reused links, recovery, password rejection/network retry, and a browser already signed into a different account. Confirm that an unassigned user sees the membership message. Email rate limiting is separate; avoid repeated invitation sends.
+
+## Join-code correction — 2026-09-26
+
+Applied `202609260004_stable_join_code_allocation.sql` after checking the linked project and a dry run listing only this migration. Earlier deployed migration files were not rewritten. The transaction preserves existing codes, reserves them in a private table, prevents code updates/reuse and handles concurrent allocation collisions with bounded retries.
+
+All nine existing public tables have identical row counts and content fingerprints before/after deployment. Read-only checks confirmed valid unique codes, publication/class identity, RLS, validated constraints, complete reservations, blocked client access to reservations, the immutable trigger and both UUID/text public RPCs. Remote lint passed and migration history matches. No hosted seed, test fixtures, reset or Auth configuration change was performed.
+
+A proposed full public-data backup export was rejected by automatic approval review because it could copy sensitive data to local temporary storage; no dump was created. Verification used aggregate fingerprints and read-only integrity checks. This is not a backup/restore verification.

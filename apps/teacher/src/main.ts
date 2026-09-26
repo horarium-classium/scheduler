@@ -61,6 +61,7 @@ function updateSyncStatus(): void {
   if (disposed) return;
   dirty = queue.dirty;
   const label = queue.error || (dirty ? "Պահպանում ենք ամպում…" : "Պահպանված է ամպում");
+  updateClassCode();
   updatePublicationStatus();
   app?.querySelectorAll(".save-status").forEach(el => { el.textContent = queue.error ? "Չպահպանված փոփոխություններ" : label; el.classList.toggle("status-warning", dirty); });
 }
@@ -141,15 +142,32 @@ function statusMarkup(): string {
   return `<div class="workspace-status"><span class="save-status ${dirty ? "status-warning" : ""}">${saveLabel}</span><span class="publish-status">${selectedClass() ? publicationLabel(selectedClass()!.id) : "Դասարան ընտրված չէ"}</span></div>`;
 }
 
+function escapeToolbarText(value: string): string {
+  const span = document.createElement("span");
+  span.textContent = value;
+  return span.innerHTML;
+}
 function renderToolbar(title: string): string {
-  return `<header class="workspace-toolbar"><div class="school-heading"><strong id="school-name"></strong><span>${title}</span></div>${statusMarkup()}<div class="toolbar-actions"><button id="settings-button" class="secondary-button" type="button">Կարգավորումներ</button><button class="copy-class-code secondary-button" type="button">Պատճենել դասարանի կոդը</button><button class="publish-button" type="button" disabled title="Հրապարակման backend-ը դեռ միացված չէ">Հրապարակել</button></div></header>`;
+  const codeMarkup = selectedClass() ? `<span class="class-code" hidden><span class="class-code-value"></span><button class="copy-class-code icon-button" type="button" aria-label="Պատճենել դասարանի կոդը" title="Պատճենել դասարանի կոդը">⧉</button></span>` : "";
+  return `<header class="workspace-toolbar"><div class="school-heading"><strong id="school-name"></strong><span>${escapeToolbarText(title)}${codeMarkup}</span></div>${statusMarkup()}<div class="toolbar-actions"><button id="settings-button" class="secondary-button" type="button">Կարգավորումներ</button><button class="publish-button" type="button" disabled title="Հրապարակման backend-ը դեռ միացված չէ">Հրապարակել</button></div></header>`;
+}
+
+function updateClassCode(): void {
+  const active = selectedClass();
+  const container = app?.querySelector<HTMLElement>(".class-code");
+  if (!container) return;
+  const code = active ? workspace.joinCode(active.id) : undefined;
+  const value = container.querySelector(".class-code-value");
+  if (value) value.textContent = code ?? "";
+  container.hidden = !code;
 }
 
 function wireToolbar(): void {
+  updateClassCode();
   document.querySelector(".copy-class-code")?.addEventListener("click", async () => {
     const active = selectedClass();
     if (!active) return;
-    const message = await copyClassCode(workspace.publication(active.id), text => navigator.clipboard.writeText(text));
+    const message = await copyClassCode(workspace.publication(active.id), workspace.joinCode(active.id), text => navigator.clipboard.writeText(text));
     if (disposed || selectedClass()?.id !== active.id) return;
     publicationMessage = message;
     const notices = document.querySelector("#notices");

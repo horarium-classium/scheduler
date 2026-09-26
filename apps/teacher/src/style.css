@@ -82,6 +82,8 @@ button { cursor: pointer; }
 .school-heading { display: grid; gap: 3px; min-width: 0; }
 .school-heading strong { overflow: hidden; color: #111827; font-size: 20px; text-overflow: ellipsis; white-space: nowrap; }
 .school-heading span { color: #4b5563; font-size: 14px; }
+.class-code { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; color: #1d4ed8; font-size: 12px; font-weight: 700; letter-spacing: .08em; vertical-align: middle; }
+.class-code .icon-button { width: 24px; height: 24px; color: #1d4ed8; font-size: 15px; line-height: 1; }
 .workspace-status { display: grid; gap: 3px; text-align: center; font-size: 12px; }
 .save-status { color: #166534; }
 .status-warning { color: #b45309; font-weight: 700; }
@@ -189,3 +191,5 @@ button { cursor: pointer; }
 
 .subject-color { gap: 5px; }
 .subject-color .color-choice { width: 30px; height: 30px; padding: 0; flex-shrink: 0; }
+
+.class-code[hidden] { display: none; }

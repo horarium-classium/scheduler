@@ -1,4 +1,4 @@
-export interface SchoolClass { id: number; name: string; }
+export interface SchoolClass { id: number; name: string; joinCode?: string; }
 export interface TimeSlot { id: number; schoolId: number; start: string; end: string; }
 export interface Subject { id: number; schoolId: number; name: string; color: string; }
 export interface Teacher { id: number; schoolId: number; name: string; }

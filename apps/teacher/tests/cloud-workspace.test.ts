@@ -7,7 +7,7 @@ const id = (n: number) => `aaaaaaaa-0000-0000-0000-${String(n).padStart(12,"0")}
 function snapshot(): WorkspaceSnapshot {
   return { version: "v1", data: {
     school: { id: school, name: "Դպրոց", timezone: "Asia/Yerevan" },
-    classes: [{ id: id(2), school_id: school, name: "5Ա", sort_order: 10, public_id: id(90), active: true }],
+    classes: [{ id: id(2), school_id: school, name: "5Ա", join_code: "KRMZ", sort_order: 10, public_id: id(90), active: true }],
     time_slots: [{ id: id(3), school_id: school, start_time: "09:00:00", end_time: "09:45:00", sort_order: 20 }],
     subjects: [{ id: id(4), school_id: school, name: "Առարկա", color: "#abcdef", active: true }],
     teachers: [{ id: id(5), school_id: school, name: "Դասատու", active: true }],
@@ -19,6 +19,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 
 test("cloud mapping preserves UUID links, nullable teachers, public IDs and noncontiguous sort orders", () => {
   const cloud = workspace(); const state = cloud.decode();
+  assert.equal(cloud.joinCode(state.classes[0]!.id), "KRMZ");
   assert.equal(state.lessons[0]!.classId, state.classes[0]!.id);
   assert.equal(state.lessons[0]!.teacherId, null);
   assert.deepEqual(cloud.changes(state), []);
@@ -76,7 +77,7 @@ test("signout disposal stops queued writes and late UI notifications", async () 
 
 function publicationFixture() {
   const value = snapshot() as WorkspaceSnapshot & { publications: import("../src/cloud-workspace.ts").PublicationStatus[] };
-  value.publications = [{ class_id: id(2), public_id: id(90), revision: null, published_at: null, is_current: false }];
+  value.publications = [{ class_id: id(2), public_id: id(90), join_code: "KRMZ", revision: null, published_at: null, is_current: false }];
   return value;
 }
 test("publication uses server UUID and acknowledged version, then validates confirmation", async () => {
@@ -134,4 +135,18 @@ test("publication metadata must identify real unique classes with consistent rev
   assert.throws(()=>parseSnapshot(value,school));
   value.publications[0]!.is_current=false;value.publications[0]!.revision=-1;
   assert.throws(()=>parseSnapshot(value,school));
+});
+
+test("class join codes reject HTML, invalid values, duplicates and inconsistent publication metadata", () => {
+  for (const code of ['<b>unexpected HTML</b>', 'krmz', 'AB01', null, 123]) {
+    const value = snapshot(); value.data.classes[0]!.join_code = code;
+    assert.throws(() => parseSnapshot(value, school));
+  }
+  const duplicate = snapshot();
+  duplicate.data.classes.push({ ...duplicate.data.classes[0]!, id: id(99), public_id: id(98) });
+  assert.throws(() => parseSnapshot(duplicate, school));
+  const mismatch = publicationFixture(); mismatch.publications[0]!.join_code = 'ABCD';
+  assert.throws(() => parseSnapshot(mismatch, school));
+  const legacy = snapshot(); delete legacy.data.classes[0]!.join_code;
+  assert.doesNotThrow(() => parseSnapshot(legacy, school));
 });
