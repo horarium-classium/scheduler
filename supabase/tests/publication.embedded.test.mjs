@@ -3,11 +3,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
+import { resolve, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import { CloudWorkspace } from "../../apps/teacher/src/cloud-workspace.ts";
 import ts from "../../apps/teacher/node_modules/typescript/lib/typescript.js";
-import { load as studentModule } from "../../apps/student/tests/load.mjs";
+const defaultStudentRoot = fileURLToPath(new URL("../../../student/", import.meta.url));
+const studentRoot = resolve(process.env.HC_STUDENT_ROOT ?? defaultStudentRoot);
+const { load: studentModule } = await import(pathToFileURL(join(studentRoot, "tests/load.mjs")).href);
 const school = "aaaaaaaa-0000-0000-0000-000000000001";
 const other = "bbbbbbbb-0000-0000-0000-000000000001";
 const classA = "aaaaaaaa-1000-0000-0000-000000000001";
@@ -83,7 +87,7 @@ test('publication migrations: atomic snapshots, privacy, roles, retries and life
   assert.equal(retry.revision,1); assert.equal(retry.publishedAt,first.publishedAt);
 
   // Check the public payload against the unchanged, actual Student parser.
-  const source = await readFile(new URL('../../apps/student/src/schedule.ts',import.meta.url),'utf8');
+  const source = await readFile(join(studentRoot, 'src/schedule.ts'),'utf8');
   const js = ts.transpileModule(source.replace('import { invoke } from "@tauri-apps/api/core";','const invoke = () => {};'), {compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
   const student = await import('data:text/javascript;base64,' + Buffer.from(js).toString('base64'));
   assert.deepEqual(student.validateSchedule(original.schedule), original.schedule);

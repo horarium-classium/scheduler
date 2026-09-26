@@ -11,7 +11,7 @@ API URL: https://soqjiqvapluubkibzrut.supabase.co
 
 - Repository migrations through `202609260004_stable_join_code_allocation.sql` applied, including the publication and four-letter class join-code migrations, without seed data or test users.
 - Local/remote migration history matches; remote database lint passed.
-- Auth public signup disabled; site URL is https://armenbadal.github.io/horarium-classium/. Redirects retain the local development URLs and allow https://armenbadal.github.io/horarium-classium/activate.html. Updated 2026-09-23; other hosted Auth settings were left unchanged.
+- Auth public signup disabled; site URL is https://horarium-classium.github.io/scheduler/. Redirects retain the local development URLs and allow https://horarium-classium.github.io/scheduler/activate.html. Updated 2026-09-23; other hosted Auth settings were left unchanged.
 - Teacher Auth is verified by the user. The cloud data adapter and workspace RPCs are implemented; the frontend changes require publication. Publication RPCs and Student integration are implemented; no local-data import was performed.
 
 ## Credentials
@@ -54,7 +54,7 @@ The requested existing Auth account was deleted and a fresh invitation sent to t
 
 The activation page handles invite/recovery callbacks with isolated in-memory credentials; it does not replace an existing browser login. Old invitation callbacks landing at the main page are forwarded to `activate.html` before normal authentication. After password setup, use the normal login page (sign out first if another account is already logged in). Missing/expired links require a new invitation; a page refresh clears the transient activation credentials. School membership must be assigned separately.
 
-The hosted configuration now declares `activate.html` as Site URL. This local declaration has NOT been applied remotely. First publish and verify the Teacher Pages build, including activation assets under `/horarium-classium/`; then inspect the linked project's hosted config diff and apply only the intended URL changes. Preserve the default Invite email `{{ .ConfirmationURL }}` template. Do not push the root local Supabase config.
+The hosted configuration now declares `activate.html` as Site URL. This local declaration has NOT been applied remotely. First publish and verify the Teacher Pages build, including activation assets under `/scheduler/`; then inspect the linked project's hosted config diff and apply only the intended URL changes. Preserve the default Invite email `{{ .ConfirmationURL }}` template. Do not push the root local Supabase config.
 
 Verify one new Dashboard invitation end to end, an old still-valid root redirect, expired/reused links, recovery, password rejection/network retry, and a browser already signed into a different account. Confirm that an unassigned user sees the membership message. Email rate limiting is separate; avoid repeated invitation sends.
 

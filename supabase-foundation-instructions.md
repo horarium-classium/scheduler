@@ -1,6 +1,6 @@
 # Supabase — փուլ 1. տեղային հիմք, schema, RLS և թեստեր
 
-Ամսաթիվ՝ 2026-09-19։ Repository՝ https://github.com/armenbadal/horarium-classium
+Ամսաթիվ՝ 2026-09-19։ Repository՝ https://github.com/horarium-classium/scheduler
 
 ## Հանձնարարություն Codex-ին
 
@@ -12,7 +12,7 @@
 
 ## 1. Գործիքներ և արդյունքի կառուցվածք
 
-- Օգտագործել Supabase CLI՝ նախագծի development dependency-ով և lockfile-ով։ Հարգել գործող package կառուցվածքը. root package-ի ավելացումը չպետք է վերակազմավորի apps/student կամ apps/teacher-ը։
+- Օգտագործել Supabase CLI՝ նախագծի development dependency-ով և lockfile-ով։ Հարգել գործող package կառուցվածքը. root package-ի փոփոխությունը չպետք է վերակազմավորի `apps/teacher`-ը կամ առանձին Student repository-ն։
 - Ստուգել CLI-ի Node/runtime պահանջները պաշտոնական փաստաթղթերով։
 - Տեղային stack-ի համար օգտագործել Docker-compatible runtime։ Եթե պետք է Docker Desktop-ը բացել կամ ներբեռնել dependency-ներ, օգտագործել միջավայրի նախատեսված թույլտվության մեխանիզմը։
 - Պահել local config-ը Git-ում, գաղտնի environment արժեքները՝ Git-ից դուրս։

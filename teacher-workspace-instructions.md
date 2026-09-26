@@ -1,7 +1,7 @@
 # Teacher — աշխատանքային էկրան և տեղային պահպանում
 
 Ամսաթիվ՝ 2026-09-19։
-Repository՝ https://github.com/armenbadal/horarium-classium
+Repository՝ https://github.com/horarium-classium/scheduler
 
 ## Հանձնարարություն Codex-ին
 

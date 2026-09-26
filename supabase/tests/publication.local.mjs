@@ -6,11 +6,14 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 const { createClient } = createRequire(new URL('../../apps/teacher/package.json', import.meta.url))('@supabase/supabase-js');
 import { CloudWorkspace } from '../../apps/teacher/src/cloud-workspace.ts';
-import { load } from '../../apps/student/tests/load.mjs';
+const defaultStudentRoot = fileURLToPath(new URL('../../../student/', import.meta.url));
+const studentRoot = resolve(process.env.HC_STUDENT_ROOT ?? defaultStudentRoot);
+const { load } = await import(pathToFileURL(join(studentRoot, 'tests/load.mjs')).href);
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const status = spawnSync(join(root, 'node_modules/.bin/supabase'), ['status', '--workdir', root, '--output', 'json'], { encoding: 'utf8' });

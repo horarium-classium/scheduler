@@ -1,21 +1,18 @@
 # Horarium Classium — ուղեցույց գործակալների համար
-
 ## Կիրառման շրջանակ
 
-Այս ֆայլը վերաբերում է ամբողջ repository-ին։ Ենթապանակի `AGENTS.md`-ը լրացնում է այն և իր շրջանակում ունի առաջնահերթություն։ Student-ի փոփոխություններից առաջ կարդա նաև `apps/student/AGENTS.md`-ը։
+Այս ֆայլը վերաբերում է ամբողջ repository-ին։ Ենթապանակի `AGENTS.md`-ը լրացնում է այն և իր շրջանակում ունի առաջնահերթություն։
 
 ## Նախագծի կառուցվածք
 
-- `apps/student/` — Windows, macOS և Linux desktop հավելված՝ TypeScript, Vanilla HTML/CSS, Vite, Tauri 2 և Rust։ Դասացուցակի բեռնումը frontend-ում է, հիշեցումների scheduler-ը՝ Rust-ում։
 - `apps/teacher/` — TypeScript և Vanilla HTML/CSS վեբ խմբագրիչ։ `src/model.ts`-ը պահում է մոդելն ու բախումների ստուգումները, `src/state.ts`-ը՝ վիճակի validation-ը, `src/main.ts`-ը՝ UI-ն։ `src/cloud-workspace.ts`-ը կատարում է ամպային տվյալների փոխակերպումն ու հերթագրված պահպանումը, `src/auth.ts`-ը՝ մուտքն ու դպրոցի բեռնումը։
 - `supabase/` — PostgreSQL migrations, RLS, local seed և pgTAP թեստեր։ Teacher-ի ամպային շերտի հիմքն է. ընթացիկ Teacher frontend-ը օգտագործում է workspace RPC-ներ՝ պահպանելով RLS-ը և հնացած տարբերակների մերժումը։
-- `.github/workflows/release.yml` — `v*.*.*` tag-ից Windows NSIS installer-ի կառուցում և GitHub Release-ի հրապարակում։ Սովորական push/PR-ի ավտոմատ ստուգումների վրա հույս մի դիր։
 
-Root-ը npm workspace չէ։ Root-ը, Student-ը և Teacher-ը ունեն առանձին `package.json` ու `package-lock.json`։ Կախվածությունները տեղադրիր համապատասխան պանակում՝ `npm ci`-ով։ Փոխիր միայն տվյալ բաղադրիչի անհրաժեշտ dependencies-ն ու lockfile-ը։
+Root-ը պահում է Supabase CLI-ն, իսկ `apps/teacher/`-ը՝ frontend-ի առանձին manifest-ը։ Կախվածությունները տեղադրիր համապատասխան պանակում՝ `npm ci`-ով։
 
 ## Ինչ կարդալ աշխատանքի սկզբում
 
-- `README.md` — Student-ի վարք, գործարկում և փաթեթավորում։
+- `README.md` — Scheduler/Teacher-ի վարք, գործարկում և հրապարակում։
 - `TESTING.md` — ավտոմատ և յուրաքանչյուր OS-ի ձեռքով ստուգումներ։
 - Teacher-ի համար՝ խնդրին համապատասխան `teacher-workspace-instructions.md`, `table-editor-instructions.md`, `subjects-teachers-instructions.md`։
 - Բազայի համար՝ `supabase/README.md`, `supabase-foundation-instructions.md`, իսկ hosted միջավայրի համար՝ `supabase/HOSTED-DEVELOPMENT.md`։
@@ -32,13 +29,6 @@ Root-ը npm workspace չէ։ Root-ը, Student-ը և Teacher-ը ունեն առա
 - Նախքան խմբագրումը ստուգիր `git status`-ը և պահպանիր օգտատիրոջ առկա փոփոխություններն ու չհետևվող ֆայլերը։
 
 ## Տվյալների և հարթակների պայմանագրեր
-
-### Student
-
-- Պահպանիր Windows/macOS/Linux համատեղելիությունը և `apps/student/AGENTS.md`-ի հարթակային կանոնները։
-- Հիշեցումները պետք է աշխատեն Rust scheduler-ից նաև թաքնված պատուհանով։ Մի տեղափոխիր դրանք միայն frontend timer-ների վրա։
-- Cache/settings ֆայլերի ուղիները որոշիր Tauri-ի application-data API-ներով։ Student-ի համար browser-ի `localStorage` մի ներմուծիր։
-- Պահպանիր դասացուցակի validation-ը, offline fallback-ը և ծանուցումների կրկնությունների կանխումը։ Teacher-ի ներքին մոդելը մի փոխանցիր Student-ին առանց հստակ համատեղելիության շերտի։
 
 ### Teacher
 
@@ -57,7 +47,7 @@ Root-ը npm workspace չէ։ Root-ը, Student-ը և Teacher-ը ունեն առա
 
 ## Գործարկում և ստուգումներ
 
-Օգտագործիր Node.js 22.17+ կամ dependencies-ի պահանջներին համատեղելի ավելի նոր տարբերակ։ Student native աշխատանքի համար անհրաժեշտ են Rust stable և տվյալ OS-ի Tauri prerequisites-ը։ Local Supabase-ի համար անհրաժեշտ է աշխատող Docker-compatible runtime։
+Օգտագործիր Node.js 22.17+ կամ dependencies-ի պահանջներին համատեղելի ավելի նոր տարբերակ։ Local Supabase-ի համար անհրաժեշտ է աշխատող Docker-compatible runtime։
 
 Teacher՝ `apps/teacher/` պանակից.
 
@@ -68,20 +58,6 @@ npm run dev
 npm test
 npm run build
 ```
-
-Student՝ `apps/student/` պանակից.
-
-```sh
-npm ci
-npm run tauri dev
-# Փոփոխությանը համապատասխան ստուգումներ՝
-npm test
-npm run build
-cargo test --manifest-path src-tauri/Cargo.toml --lib --locked
-cargo check --manifest-path src-tauri/Cargo.toml --locked
-```
-
-Student-ի `npm run dev`-ը միայն frontend preview է. native cache/settings/tray/audio ստուգումների համար պետք է Tauri shell-ը։ Native bundle-ը կառուցիր թիրախ OS-ում՝ `README.md`-ի հրամաններով։ Ռելիզի աշխատանքի ժամանակ ստուգիր տարբերակների համընկնումը՝ `npm run check:release-version -- vX.Y.Z`։
 
 Supabase՝ repository root-ից.
 

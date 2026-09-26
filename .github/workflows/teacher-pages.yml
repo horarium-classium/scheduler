@@ -35,7 +35,7 @@ jobs:
           cache-dependency-path: apps/teacher/package-lock.json
       - run: npm ci
       - run: npm test
-      - run: npm run build -- --base=/horarium-classium/
+      - run: npm run build -- --base=/scheduler/
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}

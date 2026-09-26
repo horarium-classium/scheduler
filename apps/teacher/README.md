@@ -22,21 +22,21 @@ npm run dev
 Առաջին հրապարակման համար repository-ի **Settings → Pages → Build and deployment → Source**
 դաշտում ընտրել **GitHub Actions**, ապա workflow-ը հասցնել `master` և գործարկել։
 
-Սպասվող հասցեն՝ https://armenbadal.github.io/horarium-classium/ ։
+Սպասվող հասցեն՝ https://horarium-classium.github.io/scheduler/ ։
 Հրապարակման իրական հասցեն ու արդյունքը տեսանելի են workflow-ի `github-pages` environment-ում։
 
-Pages build-ը կիրառում է `--base=/horarium-classium/`, որպեսզի JS/CSS հղումներն
+Pages build-ը կիրառում է `--base=/scheduler/`, որպեսզի JS/CSS հղումներն
 աշխատեն repository-ի ենթահասցեից։ Տեղային development-ի հասցեն չի փոխվում։
 Repository-ն վերանվանելու կամ custom domain օգտագործելու դեպքում թարմացնել այդ base-ը։
 
 Նույն build-ը տեղում ստուգելու համար՝
 
 ```sh
-npm run build -- --base=/horarium-classium/
-npm run preview -- --base=/horarium-classium/
+npm run build -- --base=/scheduler/
+npm run preview -- --base=/scheduler/
 ```
 
-Բացել preview-ի `/horarium-classium/` հասցեն, ստուգել խմբագրիչը, կարգավորումները
+Բացել preview-ի `/scheduler/` հասցեն, ստուգել խմբագրիչը, կարգավորումները
 և էջի վերաբեռնումը։ Student-ի release-ը կառավարվում է առանձին workflow-ով։
 
 ## Մուտք և հաշիվներ
@@ -124,7 +124,7 @@ RPC contract-ը, անանուն ընթերցումն ու ստուգումներ
 
 The activation page handles invite/recovery callbacks with isolated in-memory credentials; it does not replace an existing browser login. Old invitation callbacks landing at the main page are forwarded to `activate.html` before normal authentication. After password setup, use the normal login page (sign out first if another account is already logged in). Missing/expired links require a new invitation; a page refresh clears the transient activation credentials. School membership must be assigned separately.
 
-The hosted configuration now declares `activate.html` as Site URL. This local declaration has NOT been applied remotely. First publish and verify the Teacher Pages build, including activation assets under `/horarium-classium/`; then inspect the linked project's hosted config diff and apply only the intended URL changes. Preserve the default Invite email `{{ .ConfirmationURL }}` template. Do not push the root local Supabase config.
+The hosted configuration now declares `activate.html` as Site URL. This local declaration has NOT been applied remotely. First publish and verify the Teacher Pages build, including activation assets under `/scheduler/`; then inspect the linked project's hosted config diff and apply only the intended URL changes. Preserve the default Invite email `{{ .ConfirmationURL }}` template. Do not push the root local Supabase config.
 
 Verify one new Dashboard invitation end to end, an old still-valid root redirect, expired/reused links, recovery, password rejection/network retry, and a browser already signed into a different account. Confirm that an unassigned user sees the membership message. Email rate limiting is separate; avoid repeated invitation sends.
 
