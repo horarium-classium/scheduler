@@ -103,12 +103,10 @@ button { cursor: pointer; }
 .sidebar-action:hover { background: #f9fafb; }
 .danger-text { color: #b91c1c; }
 .workspace-content { min-width: 0; }
+#notices [role="status"] { margin: 10px 0 0; padding: 8px 12px; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; color: #1e40af; font-size: 12px; line-height: 1.4; }
 .empty-workspace { padding: 64px 24px; border: 1px solid #e5e7eb; border-radius: 12px; background: white; text-align: center; }
 .empty-workspace h2 { margin: 0; }
 .empty-workspace p { color: #6b7280; }
-.preview-note { margin-bottom: 14px; padding: 10px 14px; border: 1px solid #bfdbfe; border-radius: 9px; background: #eff6ff; color: #1e40af; font-size: 13px; }
-.preview-content .schedule-cell { cursor: default; }
-.preview-content .empty-cell { color: #9ca3af; font-size: 16px; }
 .school-settings { margin-bottom: 14px; }
 .school-form { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); align-items: end; gap: 10px; }
 .school-form label { display: grid; gap: 5px; color: #374151; font-size: 13px; font-weight: 700; }
@@ -187,8 +185,6 @@ button { cursor: pointer; }
 #auth-error { color: #b91c1c; margin: 0; }
 .account-bar { display: flex; align-items: center; justify-content: flex-end; gap: 16px; flex-wrap: wrap; padding: 10px 24px; background: white; border-bottom: 1px solid #e2e8f0; }
 
-.cloud-sync-bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:12px 24px; background:#eff6ff; border-bottom:1px solid #bfdbfe; }
-.cloud-sync-bar [role="status"] { flex:1; min-width:180px; }
 .school-choices { display:grid; gap:12px; }
 
 .subject-color { gap: 5px; }

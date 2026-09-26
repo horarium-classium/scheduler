@@ -9,7 +9,7 @@ import { CloudWorkspace, SaveQueue, cloudError } from "./cloud-workspace";
 export function mountEditor(workspace: CloudWorkspace, initial: TeacherState, role: "admin" | "scheduler"): () => void {
 const controller = new AbortController();
 interface Weekday { id: number; name: string; shortName: string; }
-type Page = "workspace" | "settings" | "preview";
+type Page = "workspace" | "settings";
 interface SubjectEditorState {
   mode: "create" | "edit";
   subjectId: number | null;
@@ -56,34 +56,14 @@ function nextId(items: ReadonlyArray<{ id: number }>): number {
 let disposed = false;
 let publishing = false;
 let publicationMessage = "";
-const syncBar = document.createElement("section"); 
-syncBar.className = "cloud-sync-bar";
-syncBar.innerHTML = `<span role="status"></span><button class="secondary-button retry-save" type="button" hidden>Կրկին փորձել</button><button class="secondary-button reload-cloud" type="button">Բեռնել սերվերից</button><button class="secondary-button download-draft" type="button">Ներբեռնել սևագիրը</button>`;
-app?.before(syncBar);
 const queue = new SaveQueue(value => workspace.save(value), updateSyncStatus);
 function updateSyncStatus(): void {
   if (disposed) return;
   dirty = queue.dirty;
   const label = queue.error || (dirty ? "Պահպանում ենք ամպում…" : "Պահպանված է ամպում");
-  syncBar.querySelector("span")!.textContent = label;
-  syncBar.querySelector<HTMLButtonElement>(".retry-save")!.hidden = !queue.error;
-  syncBar.querySelector<HTMLButtonElement>(".reload-cloud")!.disabled = queue.busy;
   updatePublicationStatus();
   app?.querySelectorAll(".save-status").forEach(el => { el.textContent = queue.error ? "Չպահպանված փոփոխություններ" : label; el.classList.toggle("status-warning", dirty); });
 }
-syncBar.querySelector(".retry-save")?.addEventListener("click", () => queue.retry());
-syncBar.querySelector(".download-draft")?.addEventListener("click", () => downloadText(JSON.stringify(state, null, 2), "teacher-cloud-draft.json"));
-syncBar.querySelector(".reload-cloud")?.addEventListener("click", async () => {
-  if (publishing || queue.busy || (queue.dirty && !confirm("Կան չպահպանված փոփոխություններ։ Նախ ներբեռնեք սևագիրը։ Բեռնե՞լ սերվերից և հրաժարվել այդ փոփոխություններից։"))) return;
-  const button = syncBar.querySelector<HTMLButtonElement>(".reload-cloud")!; button.disabled = true; if (app) app.inert = true;
-  try {
-    const latest = await workspace.reload();
-    if (disposed) return;
-    queue.pending = null; queue.error = ""; state = latest; dirty = false; publicationMessage = ""; closeSettingsEditor(true);
-    renderApp(); updateSyncStatus();
-  } catch { if (!disposed) syncBar.querySelector("span")!.textContent = "Բեռնումը չհաջողվեց։ Սևագիրը չի փոխվել։"; }
-  finally { button.disabled = false; if (app && !disposed) app.inert = false; }
-});
 let page: Page = "workspace";
 let dirty = false;
 let subjectEditor: SubjectEditorState | null = null;
@@ -113,13 +93,7 @@ function renderApp(): void {
   if (!app) return;
   normalizeSelection();
   if (page === "settings") renderSettings();
-  else if (page === "preview") renderPreview();
   else renderWorkspace();
-}
-
-function downloadText(text: string, filename: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-  const link = document.createElement("a"); link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url);
 }
 
 function publicationLabel(classId: number): string {
@@ -152,7 +126,6 @@ async function publishSelectedClass(): Promise<void> {
   if (!state.lessons.some(l => l.classId === active.id) && !confirm("Հրապարակե՞լ դատարկ դասացուցակը։ Այն կփոխարինի այս դասարանի նախկին հրապարակմանը։")) return;
   publishing = true; publicationMessage = ""; updatePublicationStatus();
   if (app) app.inert = true;
-  syncBar.querySelector<HTMLButtonElement>(".reload-cloud")!.disabled = true;
   try {
     await workspace.publish(active.id, state);
     if (!disposed) publicationMessage = `«${active.name}» դասարանի հրապարակումը հաստատված է։`;
@@ -168,8 +141,8 @@ function statusMarkup(): string {
   return `<div class="workspace-status"><span class="save-status ${dirty ? "status-warning" : ""}">${saveLabel}</span><span class="publish-status">${selectedClass() ? publicationLabel(selectedClass()!.id) : "Դասարան ընտրված չէ"}</span></div>`;
 }
 
-function renderToolbar(title: string, preview = false): string {
-  return `<header class="workspace-toolbar"><div class="school-heading"><strong id="school-name"></strong><span>${title}</span></div>${statusMarkup()}<div class="toolbar-actions"><button id="settings-button" class="secondary-button" type="button">Կարգավորումներ</button>${preview ? `<button id="back-to-editor" class="secondary-button" type="button">Վերադառնալ խմբագրիչ</button>` : `<button id="preview-button" class="secondary-button" type="button" ${selectedClass() ? "" : "disabled"}>Նախադիտում</button>`}<button class="copy-class-code secondary-button" type="button">Պատճենել դասարանի կոդը</button><button class="publish-button" type="button" disabled title="Հրապարակման backend-ը դեռ միացված չէ">Հրապարակել</button></div></header>`;
+function renderToolbar(title: string): string {
+  return `<header class="workspace-toolbar"><div class="school-heading"><strong id="school-name"></strong><span>${title}</span></div>${statusMarkup()}<div class="toolbar-actions"><button id="settings-button" class="secondary-button" type="button">Կարգավորումներ</button><button class="copy-class-code secondary-button" type="button">Պատճենել դասարանի կոդը</button><button class="publish-button" type="button" disabled title="Հրապարակման backend-ը դեռ միացված չէ">Հրապարակել</button></div></header>`;
 }
 
 function wireToolbar(): void {
@@ -186,21 +159,16 @@ function wireToolbar(): void {
   updatePublicationStatus();
   const schoolName = document.querySelector("#school-name"); if (schoolName) schoolName.textContent = state.school.name;
   document.querySelector("#settings-button")?.addEventListener("click", () => { page = "settings"; renderApp(); });
-  document.querySelector("#preview-button")?.addEventListener("click", () => { page = "preview"; renderApp(); });
-  document.querySelector("#back-to-editor")?.addEventListener("click", () => { page = "workspace"; renderApp(); });
 }
 
 function renderNotices(container: Element): void {
-  const note = document.createElement("p");
-  note.textContent = "Ամպային սևագիր · Հանրային դասացուցակը փոխվում է միայն հրապարակումից հետո։";
-  container.append(note);
   if (publicationMessage) { const message = document.createElement("p"); message.setAttribute("role", "status"); message.textContent = publicationMessage; container.append(message); }
 }
 
 function renderWorkspace(): void {
   if (!app) return;
   const active = selectedClass();
-  app.innerHTML = `<main class="workspace-page">${renderToolbar(active ? `${active.name} դասարան` : "Դասարան ընտրված չէ")}<div id="notices"></div><div class="workspace-layout"><aside class="class-sidebar"><div class="sidebar-heading"><h2>Դասարաններ</h2><button id="add-class" class="icon-button" type="button" aria-label="Ավելացնել դասարան" title="Ավելացնել դասարան">+</button></div><div id="class-switcher" class="class-switcher"></div><div id="class-actions" class="class-actions"></div></aside><section class="workspace-content"><div id="schedule-container"></div></section></div></main>`;
+  app.innerHTML = `<main class="workspace-page">${renderToolbar(active ? `${active.name} դասարան` : "Դասարան ընտրված չէ")}<div class="workspace-layout"><aside class="class-sidebar"><div class="sidebar-heading"><h2>Դասարաններ</h2><button id="add-class" class="icon-button" type="button" aria-label="Ավելացնել դասարան" title="Ավելացնել դասարան">+</button></div><div id="class-switcher" class="class-switcher"></div><div id="class-actions" class="class-actions"></div></aside><section class="workspace-content"><div id="schedule-container"></div><div id="notices"></div></section></div></main>`;
   wireToolbar(); const notices = document.querySelector("#notices"); if (notices) renderNotices(notices);
   renderClassSwitcher();
   document.querySelector("#add-class")?.addEventListener("click", addClass);
@@ -300,12 +268,6 @@ function openLessonDialog(classId: number, weekdayId: number, timeSlotId: number
   dialog.querySelectorAll(".cancel-dialog").forEach((button) => button.addEventListener("click", () => dialog.close("cancel")));
   dialog.addEventListener("close", () => { const changed = dialog.returnValue === "changed"; const goToSettings = dialog.returnValue === "settings"; dialog.remove(); if (dialog.returnValue === "conflict" && conflictTarget !== null) { state.lastSelectedClassId = conflictTarget; page = "workspace"; persist(); renderApp(); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${weekdayId}"][data-time-slot="${timeSlotId}"]`)?.focus()); return; } if (changed) renderWorkspace(); if (goToSettings) { page = "settings"; renderApp(); openSubjectCreator(); return; } requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`.schedule-cell[data-weekday="${weekdayId}"][data-time-slot="${timeSlotId}"]`)?.focus() ?? returnFocus.focus()); });
   dialog.showModal(); subject?.focus();
-}
-
-function renderPreview(): void {
-  if (!app) return; const active = selectedClass();
-  app.innerHTML = `<main class="workspace-page">${renderToolbar(active ? `${active.name} դասարան` : "Դասարան ընտրված չէ", true)}<div class="preview-note">Սա ընթացիկ սևագրի միայն ընթերցվող նախադիտումն է։ Այն հրապարակված չէ։</div><div id="notices"></div><section id="preview-content" class="preview-content"></section></main>`;
-  wireToolbar(); const notices = document.querySelector("#notices"); if (notices) renderNotices(notices); const container = document.querySelector("#preview-content"); if (active && container) renderWeekTable(active.id, container, false); else if (container) container.textContent = "Նախադիտման համար դասարան չկա։";
 }
 
 function renderSettings(): void {
@@ -497,9 +459,9 @@ function createSlotEditor(slot?: TimeSlot): HTMLElement {
 window.addEventListener("beforeunload", (event) => { if (!dirty && !publishing) return; event.preventDefault(); event.returnValue = ""; }, { signal: controller.signal });
 window.addEventListener("teacher-before-leave", (event) => {
   if (publishing) { event.preventDefault(); return; }
-  if (queue.dirty && !confirm("Կան չպահպանված փոփոխություններ։ Նախ ներբեռնեք սևագիրը։ Միևնույն է դուրս գա՞լ։")) event.preventDefault();
+  if (queue.dirty && !confirm("Կան չպահպանված փոփոխություններ։ Միևնույն է դուրս գա՞լ։")) event.preventDefault();
 }, { signal: controller.signal });
 renderApp();
 updateSyncStatus();
-return () => { disposed = true; queue.dispose(); controller.abort(); syncBar.remove(); if (app) app.inert = false; document.querySelectorAll("dialog").forEach(dialog => dialog.remove()); app?.replaceChildren(); };
+return () => { disposed = true; queue.dispose(); controller.abort(); if (app) app.inert = false; document.querySelectorAll("dialog").forEach(dialog => dialog.remove()); app?.replaceChildren(); };
 }
