@@ -29,14 +29,14 @@ jobs:
           cache: npm
           cache-dependency-path: |
             scheduler/package-lock.json
-            scheduler/apps/teacher/package-lock.json
+            scheduler/scheduler/package-lock.json
       - run: npm ci
         working-directory: scheduler
       - run: npm ci
-        working-directory: scheduler/apps/teacher
+        working-directory: scheduler/scheduler
       - run: npm run publication:test:embedded
         working-directory: scheduler
       - run: npm test
-        working-directory: scheduler/apps/teacher
+        working-directory: scheduler/scheduler
       - run: npm run build -- --base=/scheduler/
-        working-directory: scheduler/apps/teacher
+        working-directory: scheduler/scheduler

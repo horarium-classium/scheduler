@@ -2,7 +2,7 @@
 
 ## Տեղային գործարկում
 
-Node.js 22.17+ տարբերակով, `apps/teacher` պանակից՝
+Node.js 22.17+ տարբերակով, `scheduler` պանակից՝
 
 ```sh
 npm ci
@@ -14,7 +14,7 @@ npm run dev
 ## GitHub Pages
 
 `.github/workflows/teacher-pages.yml`-ը ստուգում և կառուցում է հավելվածը։
-`master`-ի push-ի ժամանակ, եթե փոխվել է `apps/teacher/**` կամ workflow-ը,
+`master`-ի push-ի ժամանակ, եթե փոխվել է `scheduler/**` կամ workflow-ը,
 այն նաև հրապարակում է `dist`-ը GitHub Pages-ում։ Pull request-երի դեպքում
 կատարվում են միայն ստուգումն ու build-ը։ Actions-ից կարելի է նաև ձեռքով
 գործարկել **Teacher Pages** workflow-ը՝ ընտրելով `master`։

@@ -140,13 +140,13 @@ Icon-երի փոխարինումից հետո առանձին անցել են `np
 - Local HTTP API: authenticated membership lookup, cloud adapter save, second-client read, stale-write rejection, and test-data cleanup passed.
 - Hosted: workspace migration applied without seeds; existing «Տնային դպրոց» membership linked to the confirmed user.
 - Browser visual/end-to-end interaction check remains unverified: browser tool could not verify its admin-enforced policy.
-- Real published Teacher UI needs deployment and the manual checks in `apps/teacher/README.md`.
+- Real published Teacher UI needs deployment and the manual checks in `scheduler/README.md`.
 
 ## Publication backend
 
 Run `npm run publication:test:embedded` at repository root after installing root, Teacher and Student dependencies. This starts no server and tests migrations, RLS/roles, immutable history, idempotency, stale versions, invalid references, empty schedules, class lifecycle, anonymous privacy and the actual Student parser. PGlite uses a minimal Auth fixture; it does not verify hosted Auth/PostgREST or simultaneous connections.
 
-Teacher publication adapter/status tests run with `npm test --prefix apps/teacher`. Against an already running local Supabase with the new migration applied, run `npm run supabase:test` (includes publication and two-connection concurrency) and `npm run supabase:lint`. Never run those local database fixtures against hosted data. Manual publication checks are in `supabase/PUBLICATION.md`.
+Teacher publication adapter/status tests run with `npm test --prefix scheduler`. Against an already running local Supabase with the new migration applied, run `npm run supabase:test` (includes publication and two-connection concurrency) and `npm run supabase:lint`. Never run those local database fixtures against hosted data. Manual publication checks are in `supabase/PUBLICATION.md`.
 
 ## Student Supabase — 2026-09-26
 

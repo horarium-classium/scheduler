@@ -47,11 +47,11 @@ Student-ը օգտագործում է `publication-v3.json` և `publication-v3.in
 
 ```sh
 npm ci
-npm ci --prefix apps/teacher
+npm ci --prefix scheduler
 npm ci --prefix ../student
 npm run publication:test:embedded
-npm test --prefix apps/teacher
-npm run build --prefix apps/teacher
+npm test --prefix scheduler
+npm run build --prefix scheduler
 ```
 
 Embedded թեստը PGlite PostgreSQL-ով իրական migrations-ն ու RLS-ն է ստուգում՝ առանց սերվերի, ցանցային կապի կամ hosted տվյալների։ Auth-ը ներկայացված է թեստային `auth.uid()`/users/roles fixture-ով, իսկ գաղտնաբառերի seed-ին պետք եղած pgcrypto-ն բաց է թողնվում։ Այն ստուգում է նաև payload-ը Student-ի իրական parser-ով։ Սա GoTrue/PostgREST կամ բազմամիացում concurrency ստուգման փոխարինում չէ։
@@ -69,7 +69,7 @@ Embedded թեստը PGlite PostgreSQL-ով իրական migrations-ն ու RLS-�
 ## Teacher → Student տեղային փորձարկում
 
 1. Միայն գործող **տեղային** Supabase-ում համոզվեք, որ publication migration-ը կիրառված է։ Օգտագործողի բազան մի reset արեք և hosted-ի դեմ թեստեր մի գործարկեք։ Ստեղծեք առանձին փորձնական դպրոց/անդամակցություն կամ օգտվեք հատուկ փորձնական դպրոցից. պահպանեք դրա UUID-ները։
-2. Teacher-ի և Student-ի չհետևվող `.env.local` ֆայլերում օգտագործեք նույն local URL-ն ու հանրային բանալին։ Teacher՝ `npm run dev --prefix apps/teacher`, Student՝ `../student` repository-ից `npm run tauri dev`։ Student-ի փորձարկման համար օգտագործեք առանձին OS փորձնական օգտատեր՝ իրական cache/settings/autostart-ը չփոխելու համար։
+2. Teacher-ի և Student-ի չհետևվող `.env.local` ֆայլերում օգտագործեք նույն local URL-ն ու հանրային բանալին։ Teacher՝ `npm run dev --prefix scheduler`, Student՝ `../student` repository-ից `npm run tauri dev`։ Student-ի փորձարկման համար օգտագործեք առանձին OS փորձնական օգտատեր՝ իրական cache/settings/autostart-ը չփոխելու համար։
 3. Teacher-ում ստեղծեք երկու փորձնական դասարան, ավելացրեք դաս և սպասեք ամպային պահպանմանը։ Հրապարակեք առաջինը, սեղմեք «Պատճենել դասարանի կոդը»։ Չհրապարակված դասարանի գործողությունը բացատրում է նախ հրապարակելու պահանջը, clipboard-ի մերժումը՝ սխալը։
 4. Student-ում ստուգեք կոդը, դպրոցի/դասարանի անունները և հաստատեք «Միանալ»։ Ստուգեք դպրոցի timezone-ով դասերն ու ժամը՝ համակարգչի timezone-ից տարբեր գոտով։
 5. Անջատեք ցանցը և ամբողջությամբ վերագործարկեք Student-ը։ Նույն դասացուցակը պետք է երևա «պահված տարբերակ» նշումով։ Վերականգնեք կապը, Teacher-ում փոխեք դասը և կրկին հրապարակեք. Student-ի վերագործարկումը պետք է բեռնի նոր revision-ը։

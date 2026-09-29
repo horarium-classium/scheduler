@@ -4,12 +4,12 @@ on:
   push:
     branches: [master]
     paths:
-      - 'apps/teacher/**'
+      - 'scheduler/**'
       - '.github/workflows/teacher-pages.yml'
   pull_request:
     branches: [master]
     paths:
-      - 'apps/teacher/**'
+      - 'scheduler/**'
       - '.github/workflows/teacher-pages.yml'
   workflow_dispatch:
 
@@ -25,14 +25,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/teacher
+        working-directory: scheduler
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: apps/teacher/package-lock.json
+          cache-dependency-path: scheduler/package-lock.json
       - run: npm ci
       - run: npm test
       - run: npm run build -- --base=/scheduler/
@@ -41,7 +41,7 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: apps/teacher/dist
+          path: scheduler/dist
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'

@@ -5,10 +5,10 @@
 
 ## Նախագծի կառուցվածք
 
-- `apps/teacher/` — TypeScript և Vanilla HTML/CSS վեբ խմբագրիչ։ `src/model.ts`-ը պահում է մոդելն ու բախումների ստուգումները, `src/state.ts`-ը՝ վիճակի validation-ը, `src/main.ts`-ը՝ UI-ն։ `src/cloud-workspace.ts`-ը կատարում է ամպային տվյալների փոխակերպումն ու հերթագրված պահպանումը, `src/auth.ts`-ը՝ մուտքն ու դպրոցի բեռնումը։
+- `scheduler/` — TypeScript և Vanilla HTML/CSS վեբ խմբագրիչ։ `src/model.ts`-ը պահում է մոդելն ու բախումների ստուգումները, `src/state.ts`-ը՝ վիճակի validation-ը, `src/main.ts`-ը՝ UI-ն։ `src/cloud-workspace.ts`-ը կատարում է ամպային տվյալների փոխակերպումն ու հերթագրված պահպանումը, `src/auth.ts`-ը՝ մուտքն ու դպրոցի բեռնումը։
 - `supabase/` — PostgreSQL migrations, RLS, local seed և pgTAP թեստեր։ Teacher-ի ամպային շերտի հիմքն է. ընթացիկ Teacher frontend-ը օգտագործում է workspace RPC-ներ՝ պահպանելով RLS-ը և հնացած տարբերակների մերժումը։
 
-Root-ը պահում է Supabase CLI-ն, իսկ `apps/teacher/`-ը՝ frontend-ի առանձին manifest-ը։ Կախվածությունները տեղադրիր համապատասխան պանակում՝ `npm ci`-ով։
+Root-ը պահում է Supabase CLI-ն, իսկ `scheduler/`-ը՝ frontend-ի առանձին manifest-ը։ Կախվածությունները տեղադրիր համապատասխան պանակում՝ `npm ci`-ով։
 
 ## Ինչ կարդալ աշխատանքի սկզբում
 
@@ -49,7 +49,7 @@ Root-ը պահում է Supabase CLI-ն, իսկ `apps/teacher/`-ը՝ frontend-ի
 
 Օգտագործիր Node.js 22.17+ կամ dependencies-ի պահանջներին համատեղելի ավելի նոր տարբերակ։ Local Supabase-ի համար անհրաժեշտ է աշխատող Docker-compatible runtime։
 
-Teacher՝ `apps/teacher/` պանակից.
+Teacher՝ `scheduler/` պանակից.
 
 ```sh
 npm ci
